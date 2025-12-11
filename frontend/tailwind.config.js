@@ -10,4 +10,8 @@ export default {
     extend: {},
   },
   plugins: [daisyui],
+  daisyui: {
+    themes: ["light"], // Chỉ dùng theme sáng
+    darkTheme: "light", // Ngăn DaisyUI chuyển sang dark
+  },
 }
