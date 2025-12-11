@@ -27,6 +27,22 @@ const router = createRouter({
       path: '/student/exam',
       component: () => import('../pages/students/ExamPage.vue'),
     },
+    {
+      path: '/teacher/dashboard',
+      component: () => import('../pages/teachers/TeacherDashboardPage.vue'),
+    },
+    {
+      path: '/teacher/exams',
+      component: () => import('../pages/teachers/ExamsPage.vue'),
+    },
+    {
+      path: '/teacher/questions',
+      component: () => import('../pages/teachers/QuestionsPage.vue'),
+    },
+    {
+      path: '/teacher/exam/:id/results',
+      component: () => import('../pages/teachers/ExamResultsPage.vue'),
+    },
   ],
 })
 
