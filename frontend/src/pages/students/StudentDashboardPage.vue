@@ -26,8 +26,8 @@ const stats = {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center">
         <StudentHeader />
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center">
         <div class="container_i flex gap-6 w-full max-w-5xl py-8">
             <!-- Left -->
             <div class="left flex-[3] flex flex-col gap-6 animate-fade-in">

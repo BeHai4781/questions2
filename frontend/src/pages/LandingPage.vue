@@ -17,7 +17,7 @@ import AppFooter from '@/includes/AppFooter.vue';
 			<a href="#about" class="hover:text-indigo-600 transition">Giới thiệu</a>
 			<a href="#contact" class="hover:text-indigo-600 transition">Liên hệ</a>
 		</nav>
-        <div class="flex gap-4">
+        <div class="flex gap-4 text-white">
             <a href="/login" class="btn btn-accent rounded-lg">Đăng nhập</a>
             <a href="/register" class="btn btn-primary rounded-lg">Đăng ký</a>
         </div>

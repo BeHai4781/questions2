@@ -1,5 +1,5 @@
 <template>
-    <footer class="w-full h-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-8 mt-12 mt-0">
+    <footer class="w-full h-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-8 mt-12 mt-0 ">
         <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between px-6 gap-6">
             <div class="flex items-center gap-3">
                 <img src="/logo.svg" alt="Logo" class="h-8 w-8 bg-white border rounded" />
