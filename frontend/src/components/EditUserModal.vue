@@ -93,7 +93,7 @@ function submitForm() {
             name="username"
             disabled
             placeholder=" "
-            class="peer px-5 py-3 rounded-lg border border-gray-300 bg-gray-100 text-black w-full"
+            class="peer px-5 py-3 rounded-lg border border-gray-300 bg-gray-100 text-black w-full cursor-not-allowed"
           />
           <label
             for="username"

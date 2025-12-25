@@ -50,6 +50,18 @@ const router = createRouter({
     {
       path: '/admin/users',
       component: () => import('../pages/admins/UserManagePage.vue'),
+    },
+    {
+      path: '/admin/exams',
+      component: () => import('../pages/admins/ExamManagePage.vue'),
+    },
+    {
+      path: '/admin/questions',
+      component: () => import('../pages/admins/QuestionManagePage.vue'),
+    },
+    {
+      path: '/admin/notifications',
+      component: () => import('../pages/admins/NotificationPage.vue'),
     }
   ],
 })

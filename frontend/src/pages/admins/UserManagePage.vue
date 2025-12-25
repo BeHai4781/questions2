@@ -2,8 +2,8 @@
 import { ref, computed } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
-import CreateUserModal from '@/components/createUserModal.vue'
-import EditUserModel from '@/components/EditUserModel.vue'
+import CreateUserModal from '@/components/CreateUserModal.vue'
+import EditUserModal from '@/components/EditUserModal.vue'
 
 // Dữ liệu mẫu
 const allUsers = [
@@ -143,7 +143,7 @@ const closeEditUserModal = () => {
           @click="createUserModalVisible = true"
           class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition font-semibold"
         >
-          Thêm tài khoản
+          ➕ Thêm tài khoản
         </button>
       </form>
 
@@ -204,7 +204,7 @@ const closeEditUserModal = () => {
                   <button
                     class="bg-green-400 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-green-500 transition"
                   >
-                    Mở khóa
+                    🔓 Mở khóa
                   </button>
                   <button
                     class="bg-red-400 text-white text-sm rounded px-2 py-1 hover:bg-red-700 transition"
@@ -214,15 +214,15 @@ const closeEditUserModal = () => {
                 </template>
                 <template v-else>
                   <button
-                    class="bg-red-400 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-red-700 transition"
+                    class="bg-yellow-600 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-yellow-700 transition"
                   >
-                    Vô hiệu hoá
+                    🔒 Vô hiệu hoá
                   </button>
                   <button
                     @click="editUser(user)"
                     class="bg-blue-600 text-white text-sm rounded px-2 py-1 hover:bg-blue-700 transition"
                   >
-                    Cập nhật
+                    ✏️ Cập nhật
                   </button>
                 </template>
               </td>
@@ -256,5 +256,5 @@ const closeEditUserModal = () => {
     <AppFooter />
   </div>
   <CreateUserModal :visible="createUserModalVisible" :close="closeCreateUserModal" />
-  <EditUserModel :visible="editUserModalVisible" @close="closeEditUserModal" :user="selectedUser" />
+  <EditUserModal :visible="editUserModalVisible" @close="closeEditUserModal" :user="selectedUser" />
 </template>
