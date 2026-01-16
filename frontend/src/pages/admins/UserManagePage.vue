@@ -14,7 +14,7 @@ const allUsers = [
     phone: '0123456789',
     username: 'nguyenvana',
     role: 'student',
-    status: 'actived',
+    status: 'active',
   },
   {
     id: 2,
@@ -32,7 +32,7 @@ const allUsers = [
     phone: '0111222333',
     username: 'levanc',
     role: 'admin',
-    status: 'actived',
+    status: 'active',
   },
   {
     id: 4,
@@ -50,7 +50,7 @@ const allUsers = [
     phone: '0333444555',
     username: 'hoangvane',
     role: 'teacher',
-    status: 'actived',
+    status: 'active',
   },
 ]
 
