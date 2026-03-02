@@ -1,0 +1,17 @@
+{
+  "name": "lms/lms-backend-php",
+  "description": "Backend API (PHP) ported from Node/Express version",
+  "require": {
+    "php": ">=8.1",
+    "firebase/php-jwt": "^6.12",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
