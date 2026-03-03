@@ -47,7 +47,6 @@ function startTimer() {
     }
   }, 1000)
 }
-
 async function loadExam() {
   if (!props.examId) return
   loading.value = true
@@ -64,11 +63,15 @@ async function loadExam() {
     loading.value = false
     return
   }
+  console.log('Loaded exam:', res)
   exam.value = examData
-  questions.value = normalizeQuestions(examData)
+  questions.value = res.data?.questions ?? normalizeQuestions(examData)
   const init = {}
   questions.value.forEach((q) => {
     init[q.id] = null
+  })
+  questions.value.map((q) => {
+    
   })
   answers.value = { ...init }
   startTimer()
@@ -135,6 +138,21 @@ function handleCancel() {
 }
 
 function answerOptions(q) {
+  // Nếu có các trường answer_a, answer_b, answer_c, answer_d thì trả về theo thứ tự
+  if (
+    q.hasOwnProperty('answer_a') ||
+    q.hasOwnProperty('answer_b') ||
+    q.hasOwnProperty('answer_c') ||
+    q.hasOwnProperty('answer_d')
+  ) {
+    return [
+      { key: 0, text: q.answer_a ?? '' },
+      { key: 1, text: q.answer_b ?? '' },
+      { key: 2, text: q.answer_c ?? '' },
+      { key: 3, text: q.answer_d ?? '' },
+    ]
+  }
+  // Nếu có dạng mảng answers/options thì giữ nguyên logic cũ
   const ans = q.answers || q.options
   if (Array.isArray(ans)) return ans.map((a, i) => ({ key: i, text: typeof a === 'string' ? a : a?.text ?? a?.content ?? '' }))
   return []
@@ -160,7 +178,7 @@ function answerOptions(q) {
           class="question-box mb-6 p-4 border border-gray-200 rounded-lg"
         >
           <b>Câu {{ idx + 1 }}:</b> {{ q.question || q.content }}
-          <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div class="mt-2 grid grid-cols-1 md:grid-cols-1 gap-2">
             <label
               v-for="ans in answerOptions(q)"
               :key="ans.key"

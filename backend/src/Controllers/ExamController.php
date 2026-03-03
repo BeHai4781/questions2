@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\ExamModel;
+use App\Models\QuestionModel;
 use App\Utils\Response;
 
 final class ExamController
@@ -53,7 +54,9 @@ final class ExamController
             Response::error('Exam not found', 404, 'EXAM_NOT_FOUND');
             return;
         }
-        Response::success(['exam' => $exam], 'Exam retrieved successfully');
+        $model2 = new QuestionModel();
+        $questions = $model2->find(['examId' => $id], 0, 100);
+        Response::success(['exam' => $exam, 'questions' => $questions], 'Exam retrieved successfully');
     }
 
     public static function createExam(array $body, array $currentUser): void
