@@ -62,6 +62,10 @@ const router = createRouter({
     {
       path: '/admin/notifications',
       component: () => import('../pages/admins/NotificationPage.vue'),
+    },
+    {
+      path: '/profile',
+      component: () => import('../pages/ProfilePage.vue'),
     }
   ],
 })

@@ -84,7 +84,7 @@ watch(
 const examTitle = computed(() => exam.value?.title ?? exam.value?.name ?? attempt.value?.title ?? 'Đề thi')
 const examDuration = computed(() => exam.value?.duration ?? attempt.value?.duration ?? '-')
 const attemptTime = computed(() => attempt.value?.time ?? '-')
-const totalQuestions = computed(() => questions.value.length || attempt.value?.total_questions ?? exam.value?.total_questions ?? '-')
+const totalQuestions = computed(() => (questions.value.length || attempt.value?.total_questions) ?? exam.value?.total_questions ?? '-')
 const resultScore = computed(() => attempt.value?.result ?? attempt.value?.score ?? '-')
 const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?.submittedAt ?? '-')
 </script>
@@ -96,7 +96,7 @@ const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?
     <div class="flex flex-col md:flex-row gap-8">
       <!-- Thông tin đề thi bên trái -->
       <div class="md:w-1/3 w-full flex-shrink-0 mb-8 md:mb-0">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ exam.title }}</h2>
+        <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ examTitle }}</h2>
         <div class="mb-4 text-gray-700">
           <b>Thời gian đề:</b> {{ examDuration }} phút<br />
           <b>Thời gian làm bài:</b> {{ attemptTime }} phút<br />

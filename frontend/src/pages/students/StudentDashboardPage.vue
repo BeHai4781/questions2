@@ -81,6 +81,7 @@ function examScore(attempt) {
           <h3 class="text-lg font-bold mb-4 text-indigo-700">Đề thi mới nhất</h3>
           <p v-if="loading" class="text-gray-500">Đang tải...</p>
           <p v-else-if="error" class="text-red-600">{{ error }}</p>
+          <p v-else-if="latestExams.length === 0" class="text-gray-500">Không có đề thi nào.</p>
           <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <template v-for="exam in latestExams" :key="exam.id">
               <div class="md:col-span-1 flex flex-col gap-2">
@@ -105,13 +106,16 @@ function examScore(attempt) {
         <div class="box bg-white rounded-xl shadow p-6">
           <h3 class="text-lg font-bold mb-4 text-indigo-700">Bài thi đã làm gần đây</h3>
           <div class="flex flex-col gap-2 mb-2">
+            <p v-if="loading" class="text-gray-500">Đang tải...</p>
+            <p v-else-if="error" class="text-red-600">{{ error }}</p>
+            <p v-else-if="recentAttempts.length === 0" class="text-gray-500">Bạn chưa làm bài thi nào.</p>
             <template v-for="a in recentAttempts" :key="a.id">
               <div class="item border border-gray-200 rounded-lg p-3 bg-slate-50 text-indigo-700">
                 {{ examTitle(a) }} - Kết quả: {{ examScore(a) }} điểm
               </div>
             </template>
           </div>
-          <a href="/student/history" class="text-indigo-600 hover:underline text-sm">Lịch sử bài làm</a>
+          <a v-if="recentAttempts.length > 0" href="/student/history" class="text-indigo-600 hover:underline text-sm">Lịch sử bài làm</a>
         </div>
       </div>
       <div class="right flex-1 border border-gray-200 rounded-xl bg-white shadow p-6 flex flex-col gap-4 h-fit text-indigo-700 animate-fade-in">
