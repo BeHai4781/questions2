@@ -96,11 +96,14 @@ final class UserModel
         $hash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : null;
 
         $sql = 'INSERT INTO users (fullname, username, password, email, phone, status, role, is_first_login)
-                VALUES (:fullname, :username, :password, :email, :phone, :status, :role, :is_first_login)
+                VALUES (:fullname, :username, :password, :email, :phone, :status, :role, CAST(:is_first_login AS BOOLEAN))
                 RETURNING id';
 
         $status = (string)($data['status'] ?? 'actived');
         if ($status === 'active') $status = 'actived';
+
+        $isFirstLogin = $data['is_first_login'] ?? $data['isFirstLogin'] ?? false;
+        $isFirstLoginBool = $isFirstLogin === true || $isFirstLogin === 'true' || $isFirstLogin === '1';
 
         $params = [
             ':fullname' => $data['fullname'] ?? null,
@@ -110,11 +113,18 @@ final class UserModel
             ':phone' => $data['phone'] ?? null,
             ':status' => $status,
             ':role' => $data['role'] ?? null,
-            ':is_first_login' => (bool)($data['is_first_login'] ?? $data['isFirstLogin'] ?? false),
+            ':is_first_login' => $isFirstLoginBool ? 1 : 0,
         ];
 
         $st = $this->pdo->prepare($sql);
-        $st->execute($params);
+        foreach ($params as $k => $v) {
+            if ($k === ':is_first_login') {
+                $st->bindValue($k, $v, PDO::PARAM_INT);
+            } else {
+                $st->bindValue($k, $v);
+            }
+        }
+        $st->execute();
         $newId = (string)$st->fetchColumn();
 
         $user = $this->findById($newId, false);

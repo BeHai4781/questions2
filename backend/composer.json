@@ -3,7 +3,7 @@
   "description": "Backend API (PHP) ported from Node/Express version",
   "require": {
     "php": ">=8.1",
-    "firebase/php-jwt": "^6.12",
+    "firebase/php-jwt": "^6.0",
     "ext-pdo": "*",
     "ext-pdo_pgsql": "*"
   },

@@ -1,6 +1,11 @@
 <script setup>
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { toast } from 'vue3-toastify';
+import { useAuthStore } from '@/stores/auth';
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const fullname = ref('');
 const username = ref('');
@@ -9,8 +14,11 @@ const confirmPassword = ref('');
 const email = ref('');
 const phone = ref('');
 const role = ref('teacher');
+const loading = ref(false);
 
-const handleRegister = () => {
+const handleRegister = async () => {
+    if (loading.value) return;
+
     if (!fullname.value || !username.value || !password.value || !confirmPassword.value || !email.value || !phone.value || !role.value) {
         toast.error('Vui lòng nhập đầy đủ thông tin!');
         return;
@@ -23,11 +31,54 @@ const handleRegister = () => {
         toast.error('Mật khẩu xác nhận không khớp!');
         return;
     }
-    // Giả lập đăng ký thành công
-    toast.success('Đăng ký thành công!');
-    setTimeout(() => {
-        window.location.replace('/login');
-    }, 1200);
+
+    loading.value = true;
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                fullname: fullname.value,
+                username: username.value,
+                password: password.value,
+                email: email.value,
+                phone: phone.value,
+                role: role.value,
+            }),
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok || !data || data.success !== true) {
+            const message =
+                data?.error?.message ||
+                data?.message ||
+                'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!';
+            toast.error(message);
+            return;
+        }
+
+        const { token, refreshToken, user } = data.data || {};
+
+        if (!token || !user) {
+            toast.error('Phản hồi từ máy chủ không hợp lệ.');
+            return;
+        }
+
+        authStore.setAuth({ token, refreshToken, user });
+        toast.success('Đăng ký thành công!');
+
+        setTimeout(() => {
+            router.replace(authStore.getDashboardRoute());
+        }, 800);
+    } catch (err) {
+        console.error(err);
+        toast.error('Có lỗi xảy ra khi kết nối tới máy chủ.');
+    } finally {
+        loading.value = false;
+    }
 };
 </script>
 <template>
@@ -40,30 +91,30 @@ const handleRegister = () => {
             </div>
             <form class="grid grid-cols-1 md:grid-cols-2 gap-4" @submit.prevent="handleRegister">
                 <div class="form-group relative col-span-1">
-                    <input v-model="fullname" type="text" id="fullname" name="fullname" required placeholder="" class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="fullname" type="text" id="fullname" name="fullname" required placeholder="" class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="name" />
                     <label for="fullname" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">
                         Họ tên
                     </label>
                 </div>
                 
                 <div class="form-group relative col-span-1">
-                    <input v-model="username" type="text" id="username" name="username" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="username" type="text" id="username" name="username" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="username" />
                     <label for="username" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">Tên đăng nhập</label>
                 </div>
                 <div class="form-group relative col-span-1">
-                    <input v-model="password" type="password" id="password" name="password" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="password" type="password" id="password" name="password" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="new-password" />
                     <label for="password" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">Mật khẩu</label>
                 </div>
                 <div class="form-group relative col-span-1">
-                    <input v-model="confirmPassword" type="password" id="confirmPassword" name="confirmPassword" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="confirmPassword" type="password" id="confirmPassword" name="confirmPassword" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="new-password" />
                     <label for="confirmPassword" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">Xác nhận mật khẩu</label>
                 </div>
                 <div class="form-group relative col-span-1">
-                    <input v-model="email" type="email" id="email" name="email" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="email" type="email" id="email" name="email" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="email" />
                     <label for="email" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">Email</label>
                 </div>
                 <div class="form-group relative col-span-1">
-                    <input v-model="phone" type="text" id="phone" name="phone" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" />
+                    <input v-model="phone" type="text" id="phone" name="phone" required placeholder=" " class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full" autocomplete="tel" />
                     <label for="phone" class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700">Số điện thoại</label>
                 </div>
                 <div class="form-group col-span-1 md:col-span-2">
@@ -73,7 +124,14 @@ const handleRegister = () => {
                     </select>
                 </div>
                 <div class="col-span-1 md:col-span-2">
-                    <button type="submit" class="w-full px-5 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow hover:bg-indigo-700 transition">Đăng ký</button>
+                    <button
+                        type="submit"
+                        class="w-full px-5 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        :disabled="loading"
+                    >
+                        <span v-if="!loading">Đăng ký</span>
+                        <span v-else>Đang xử lý...</span>
+                    </button>
                 </div>
             </form>
             <div class="flex justify-center items-center text-sm text-gray-500 mt-2">
