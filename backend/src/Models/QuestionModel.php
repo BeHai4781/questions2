@@ -269,6 +269,7 @@ final class QuestionModel
             'difficulty' => 'level_id',
             'levelId' => 'level_id',
             'createdBy' => 'created_by',
+            'examId' => 'exam_id',
         ];
         foreach ($map as $filterKey => $col) {
             if (!array_key_exists($filterKey, $filter)) continue;
