@@ -194,7 +194,8 @@ final class Router
         });
 
         $this->map('GET', '/api/exams', function () {
-            $user = Auth::authenticate();
+            $authDisabled = (($_ENV['AUTH_DISABLED'] ?? getenv('AUTH_DISABLED') ?: 'false') === 'true');
+            $user = $authDisabled ? [] : Auth::authenticate();
             $messages = [];
             $this->validatePagination($_GET, $messages);
             if (isset($_GET['createdBy']) && !ctype_digit((string)$_GET['createdBy'])) {
@@ -209,7 +210,8 @@ final class Router
         });
 
         $this->map('GET', '/api/exams/:id', function (string $id) {
-            $user = Auth::authenticate();
+            $authDisabled = (($_ENV['AUTH_DISABLED'] ?? getenv('AUTH_DISABLED') ?: 'false') === 'true');
+            $user = $authDisabled ? [] : Auth::authenticate();
             $messages = [];
             if (!ctype_digit($id)) $messages[] = 'Invalid exam id';
             Validator::failIf($messages);
@@ -328,7 +330,8 @@ final class Router
         });
 
         $this->map('GET', '/api/exam-attempts', function () {
-            $user = Auth::authenticate();
+            $authDisabled = (($_ENV['AUTH_DISABLED'] ?? getenv('AUTH_DISABLED') ?: 'false') === 'true');
+            $user = $authDisabled ? [] : Auth::authenticate();
             $messages = [];
             $this->validatePagination($_GET, $messages);
             if (isset($_GET['examId']) && !ctype_digit((string)$_GET['examId'])) {
@@ -343,7 +346,8 @@ final class Router
         });
 
         $this->map('GET', '/api/exam-attempts/:id', function (string $id) {
-            $user = Auth::authenticate();
+            $authDisabled = (($_ENV['AUTH_DISABLED'] ?? getenv('AUTH_DISABLED') ?: 'false') === 'true');
+            $user = $authDisabled ? [] : Auth::authenticate();
             $messages = [];
             if (!ctype_digit($id)) $messages[] = 'Invalid exam attempt id';
             Validator::failIf($messages);
