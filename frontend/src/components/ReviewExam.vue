@@ -1,48 +1,92 @@
 <script setup>
-// Dữ liệu mẫu
-const exam = {
-  title: 'Đề Toán HK1',
-  duration: 45,
-  time: 40,
-  total_questions: 3,
-  result: 2,
-  submitted_at: '2025-12-01 09:30',
+import { ref, onMounted, computed, watch } from 'vue'
+import { useStudentApi } from '@/composables/useStudentApi.js'
+
+const props = defineProps({
+  attemptId: { type: String, default: null },
+})
+
+const studentApi = useStudentApi()
+const attempt = ref(null)
+const exam = ref(null)
+const loading = ref(true)
+const error = ref(null)
+
+const answerMap = ['A', 'B', 'C', 'D']
+
+const questions = computed(() => {
+  const qs = attempt.value?.questions ?? exam.value?.questions
+  if (Array.isArray(qs)) return qs
+  return []
+})
+
+const userAnswers = computed(() => {
+  const a = attempt.value?.answers
+  if (a && typeof a === 'object') return a
+  return {}
+})
+
+function getAnswerLabel(q, idx) {
+  const ans = q.answers || q.options
+  if (Array.isArray(ans) && ans[idx] != null) {
+    const v = ans[idx]
+    return typeof v === 'string' ? v : v?.text ?? v?.content ?? ''
+  }
+  return ''
 }
-const questions = [
-  {
-    id: 1,
-    question: '2 + 2 = ?',
-    answer_a: '3',
-    answer_b: '4',
-    answer_c: '5',
-    answer_d: '6',
-    correct_answer: 1, // B
-  },
-  {
-    id: 2,
-    question: '5 x 3 = ?',
-    answer_a: '15',
-    answer_b: '10',
-    answer_c: '8',
-    answer_d: '20',
-    correct_answer: 0, // A
-  },
-  {
-    id: 3,
-    question: 'Căn bậc hai của 9?',
-    answer_a: '2',
-    answer_b: '3',
-    answer_c: '4',
-    answer_d: '5',
-    correct_answer: 1, // B
-  },
-]
-const user_answers = {
-  1: 1, // đúng
-  2: 2, // sai
-  3: null, // chưa trả lời
+
+function correctIndex(q) {
+  return Number(q.correctAnswer ?? q.correct_answer ?? 0)
 }
-const answer_map = ['A', 'B', 'C', 'D']
+
+function userChoice(q) {
+  const id = q.id
+  const v = userAnswers.value[id]
+  return v === null || v === undefined ? null : Number(v)
+}
+
+async function loadAttempt() {
+  if (!props.attemptId) return
+  loading.value = true
+  error.value = null
+  const res = await studentApi.getAttemptById(props.attemptId)
+  if (!res.ok) {
+    error.value = res.error?.message || 'Không tải được bài làm'
+    loading.value = false
+    return
+  }
+  const att = res.data?.attempt ?? res.data
+  if (!att) {
+    error.value = 'Bài làm không tồn tại'
+    loading.value = false
+    return
+  }
+  attempt.value = att
+  const examId = att.exam_id ?? att.examId
+  if (examId) {
+    const examRes = await studentApi.getExamById(examId)
+    if (examRes.ok) exam.value = examRes.data?.exam ?? examRes.data
+  }
+  loading.value = false
+}
+
+onMounted(() => {
+  loadAttempt()
+})
+
+watch(
+  () => props.attemptId,
+  (id) => {
+    if (id) loadAttempt()
+  }
+)
+
+const examTitle = computed(() => exam.value?.title ?? exam.value?.name ?? attempt.value?.title ?? 'Đề thi')
+const examDuration = computed(() => exam.value?.duration ?? attempt.value?.duration ?? '-')
+const attemptTime = computed(() => attempt.value?.time ?? '-')
+const totalQuestions = computed(() => questions.value.length || attempt.value?.total_questions ?? exam.value?.total_questions ?? '-')
+const resultScore = computed(() => attempt.value?.result ?? attempt.value?.score ?? '-')
+const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?.submittedAt ?? '-')
 </script>
 
 <template>
@@ -54,11 +98,11 @@ const answer_map = ['A', 'B', 'C', 'D']
       <div class="md:w-1/3 w-full flex-shrink-0 mb-8 md:mb-0">
         <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ exam.title }}</h2>
         <div class="mb-4 text-gray-700">
-          <b>Thời gian:</b> {{ exam.duration }} phút<br />
-          <b>Thời gian làm bài:</b> {{ exam.time }} phút<br />
-          <b>Số câu hỏi:</b> {{ exam.total_questions }}<br />
-          <b>Số câu đúng:</b> {{ exam.result }}<br />
-          <b>Ngày nộp:</b> {{ exam.submitted_at }}
+          <b>Thời gian đề:</b> {{ examDuration }} phút<br />
+          <b>Thời gian làm bài:</b> {{ attemptTime }} phút<br />
+          <b>Số câu hỏi:</b> {{ totalQuestions }}<br />
+          <b>Điểm:</b> {{ resultScore }}<br />
+          <b>Ngày nộp:</b> {{ submittedAt }}
         </div>
       </div>
       <!-- Các câu hỏi bên phải -->
@@ -70,40 +114,38 @@ const answer_map = ['A', 'B', 'C', 'D']
             class="question-block border-b border-gray-200 pb-4"
           >
             <div class="mb-2">
-              <b>Câu {{ i + 1 }}:</b> {{ question.question }}
+              <b>Câu {{ i + 1 }}:</b> {{ question.question || question.content }}
             </div>
             <ul class="answers mb-2">
               <li
-                v-for="(label, idx) in answer_map"
+                v-for="(label, idx) in answerMap"
                 :key="label"
                 class="flex items-center gap-2 mb-1"
               >
-                <span>{{ label }}. {{ question['answer_' + label.toLowerCase()] }}</span>
-                <span v-if="question.correct_answer === idx" class="text-green-600"
-                  ><i class="fa fa-check-circle"></i
-                ></span>
-                <span
-                  v-if="user_answers[question.id] !== null && user_answers[question.id] === idx"
-                >
+                <span>{{ label }}. {{ getAnswerLabel(question, idx) }}</span>
+                <span v-if="correctIndex(question) === idx" class="text-green-600">✓</span>
+                <span v-if="userChoice(question) !== null && userChoice(question) === idx">
                   <span
-                    v-if="user_answers[question.id] === question.correct_answer"
+                    v-if="userChoice(question) === correctIndex(question)"
                     class="text-green-700 font-bold"
-                    >(Bạn chọn)</span
                   >
+                    (Bạn chọn)
+                  </span>
                   <span v-else class="text-red-600 font-bold">(Bạn chọn)</span>
                 </span>
               </li>
             </ul>
             <div class="mt-1">
-              <b>Đáp án đúng:</b> {{ answer_map[question.correct_answer] }}
-              <span v-if="user_answers[question.id] !== null">
-                | <b>Đáp án của bạn:</b> {{ answer_map[user_answers[question.id]] }}
+              <b>Đáp án đúng:</b> {{ answerMap[correctIndex(question)] }}
+              <span v-if="userChoice(question) !== null">
+                | <b>Đáp án của bạn:</b> {{ answerMap[userChoice(question)] }}
                 <span
-                  v-if="user_answers[question.id] === question.correct_answer"
+                  v-if="userChoice(question) === correctIndex(question)"
                   class="text-green-600 ml-2"
-                  ><i class="fa fa-check-circle"></i> Đúng</span
                 >
-                <span v-else class="text-red-600 ml-2"><i class="fa fa-times-circle"></i> Sai</span>
+                  ✓ Đúng
+                </span>
+                <span v-else class="text-red-600 ml-2">✗ Sai</span>
               </span>
               <span v-else class="text-red-600 ml-2">Bạn chưa trả lời câu này.</span>
             </div>
