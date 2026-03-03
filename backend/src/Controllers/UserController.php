@@ -12,8 +12,8 @@ final class UserController
     {
         try {
             $search = $query['search'] ?? '';
-            $status = $query['status'] ?? null; // 'actived' | 'banned' (also accepts 'active')
-            $role = $query['role'] ?? null;     // 'admin' | 'teacher' | 'student'
+            $status = $query['status'] ?? null; 
+            $role = $query['role'] ?? null;     
             $page = $query['page'] ?? 1;
             $limit = $query['limit'] ?? 10;
 
@@ -25,7 +25,6 @@ final class UserController
             ];
 
             if (is_string($status) && in_array($status, ['actived', 'active', 'banned'], true)) {
-                // UserModel will normalize 'active' -> 'actived'
                 $filter['status'] = $status;
             }
 
