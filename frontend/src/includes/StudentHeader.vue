@@ -1,5 +1,15 @@
 <script setup>
-// Không cần logic JS cho header đơn giản kiểu landing page
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const displayName = () => authStore.user?.fullname || authStore.user?.username || 'Tài khoản'
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -26,7 +36,7 @@
           <div class="w-8 h-8 rounded-full overflow-hidden border border-indigo-200">
             <img alt="Avatar" src="/avatar.png" class="w-full h-full object-cover" />
           </div>
-          <span class="hidden md:inline">Nguyễn Văn A</span>
+          <span class="hidden md:inline">{{ displayName() }}</span>
           <svg
             class="w-4 h-4 ml-1 text-indigo-500"
             fill="none"
@@ -45,10 +55,7 @@
             <a href="/student/profile">Trang cá nhân</a>
           </li>
           <li class="hover:bg-indigo-100 hover:text-indigo-700 hover:font-bold rounded">
-            <a href="/student/settings">Cài đặt</a>
-          </li>
-          <li class="hover:bg-indigo-100 hover:text-indigo-700 hover:font-bold rounded">
-            <a href="/logout">Đăng xuất</a>
+            <a href="#" @click.prevent="handleLogout">Đăng xuất</a>
           </li>
         </ul>
       </div>

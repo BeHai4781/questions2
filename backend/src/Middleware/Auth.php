@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Config\JwtConfig;
 use App\Models\UserModel;
 use App\Utils\Response;
 use App\Utils\Jwt;
@@ -12,10 +13,25 @@ use UnexpectedValueException;
 
 final class Auth
 {
+    /**
+     * Khi JWT_SECRET trống (môi trường thử nghiệm), chấp nhận header X-User-Id để nhận diện user
+     * thay vì verify JWT — chỉ dùng khi không dùng JWT_SECRET.
+     */
     /** @return array<string,mixed> */
     public static function authenticate(): array
     {
+        $secret = JwtConfig::secret();
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        $xUserId = isset($_SERVER['HTTP_X_USER_ID']) ? trim((string)$_SERVER['HTTP_X_USER_ID']) : '';
+
+        // Chế độ không dùng JWT_SECRET: ưu tiên X-User-Id (chỉ dùng cho dev/thử nghiệm)
+        if ($secret === '' && $xUserId !== '' && ctype_digit($xUserId)) {
+            $userModel = new UserModel();
+            $user = $userModel->findById($xUserId, false);
+            if ($user && ($user['status'] ?? 'actived') !== 'banned') {
+                return $user;
+            }
+        }
 
         if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
             Response::json([

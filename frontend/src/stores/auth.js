@@ -63,12 +63,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Gọi GET /api/auth/me để cập nhật thông tin user */
   async function fetchMe() {
-    if (!token.value) return null
-    const res = await fetch('/api/auth/me', {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-      },
-    })
+    const headers = {
+      ...(token.value ? { Authorization: `Bearer ${token.value}` } : {}),
+      ...(user.value?.id ? { 'X-User-Id': String(user.value.id) } : {}),
+    }
+    if (!token.value && !user.value?.id) return null
+    const res = await fetch('/api/auth/me', { headers })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.success || !data?.data?.user) return null
     user.value = data.data.user
@@ -99,6 +99,38 @@ export const useAuthStore = defineStore('auth', () => {
     return token.value ? { Authorization: `Bearer ${token.value}` } : {}
   }
 
+  /**
+   * Cập nhật thông tin cá nhân (PATCH /api/auth/me).
+   * @param {object} payload - { fullname?, phone?, newPassword? }
+   * @returns {Promise<{ ok: boolean, user?: object, error?: { message: string } }>}
+   */
+  async function updateProfile(payload) {
+    if (!token.value && !user.value?.id) return { ok: false, error: { message: 'Chưa đăng nhập' } }
+    const body = {}
+    if (payload.fullname !== undefined) body.fullname = payload.fullname
+    if (payload.phone !== undefined) body.phone = payload.phone
+    if (payload.newPassword !== undefined && payload.newPassword !== '') body.newPassword = payload.newPassword
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token.value ? { Authorization: `Bearer ${token.value}` } : {}),
+      ...(user.value?.id ? { 'X-User-Id': String(user.value.id) } : {}),
+    }
+    const res = await fetch('/api/auth/me', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data?.success) {
+      return { ok: false, error: data?.error || { message: 'Cập nhật thất bại' } }
+    }
+    if (data?.data?.user) {
+      user.value = data.data.user
+      localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+    }
+    return { ok: true, user: user.value }
+  }
+
   return {
     token,
     refreshToken,
@@ -111,5 +143,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchMe,
     refreshTokens,
     getAuthHeader,
+    updateProfile,
   }
 })

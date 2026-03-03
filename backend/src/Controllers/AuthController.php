@@ -114,6 +114,53 @@ final class AuthController
             throw $e;
         }
     }
+    public static function updateMe(array $currentUser, array $body): void
+    {
+        try {
+            $userId = (string)($currentUser['id'] ?? '');
+            if ($userId === '') {
+                Response::error('Unauthorized', 401, 'UNAUTHORIZED');
+                return;
+            }
+
+            $fullname = isset($body['fullname']) ? trim((string)$body['fullname']) : null;
+            $phone = isset($body['phone']) ? (string)$body['phone'] : null;
+            $newPassword = isset($body['newPassword']) ? (string)$body['newPassword'] : null;
+
+            $userModel = new UserModel();
+            $existing = $userModel->findById($userId, false);
+            if (!$existing) {
+                Response::error('User not found', 404, 'USER_NOT_FOUND');
+                return;
+            }
+
+            $updates = [];
+            if ($fullname !== null) {
+                $updates['fullname'] = $fullname;
+            }
+            if ($phone !== null) {
+                $updates['phone'] = $phone;
+            }
+            if ($newPassword !== null && $newPassword !== '') {
+                if (strlen($newPassword) < 6) {
+                    Response::error('New password must be at least 6 characters', 400, 'INVALID_PASSWORD');
+                    return;
+                }
+                $updates['newPassword'] = $newPassword;
+            }
+
+            if (empty($updates)) {
+                $updated = $userModel->findById($userId, false);
+                Response::success(['user' => $updated], 'No changes');
+                return;
+            }
+
+            $updated = $userModel->updateById($userId, $updates);
+            Response::success(['user' => $updated], 'Profile updated successfully');
+        } catch (\Throwable $e) {
+            throw $e;
+        }
+    }
 
     public static function refreshToken(array $body): void
     {

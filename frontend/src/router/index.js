@@ -28,6 +28,10 @@ const router = createRouter({
       component: () => import('../pages/students/ExamPage.vue'),
     },
     {
+      path: '/student/profile',
+      component: () => import('../pages/ProfilePage.vue'),
+    },
+    {
       path: '/teacher/dashboard',
       component: () => import('../pages/teachers/TeacherDashboardPage.vue'),
     },

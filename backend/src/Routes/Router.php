@@ -69,6 +69,17 @@ final class Router
             AuthController::getMe($user);
         });
 
+        $this->map('PATCH', '/api/auth/me', function () {
+            $user = Auth::authenticate();
+            $body = $this->jsonBody();
+            $messages = [];
+            if (isset($body['newPassword']) && strlen(trim((string)$body['newPassword'])) > 0 && strlen(trim((string)$body['newPassword'])) < 6) {
+                $messages[] = 'newPassword must be at least 6 characters';
+            }
+            Validator::failIf($messages);
+            AuthController::updateMe($user, $body);
+        });
+
         $this->map('POST', '/api/auth/refresh', function () {
             $body = $this->jsonBody();
             $messages = [];
