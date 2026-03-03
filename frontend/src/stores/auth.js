@@ -94,9 +94,12 @@ export const useAuthStore = defineStore('auth', () => {
     return true
   }
 
-  /** Header Authorization để gắn vào request (hoặc null) */
+  /** Header Authorization/X-User-Id để gắn vào request (dev không dùng JWT_SECRET vẫn hoạt động) */
   function getAuthHeader() {
-    return token.value ? { Authorization: `Bearer ${token.value}` } : {}
+    const headers = {}
+    if (token.value) headers.Authorization = `Bearer ${token.value}`
+    if (user.value?.id) headers['X-User-Id'] = String(user.value.id)
+    return headers
   }
 
   /**
