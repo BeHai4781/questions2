@@ -24,13 +24,30 @@ final class ExamAttemptModel
     {
         if (!ctype_digit($id)) return null;
 
-        // Schema mới (questions3.sql): sử dụng bảng exam_results
         $st = $this->pdo->prepare('SELECT * FROM exam_results WHERE id = :id LIMIT 1');
         $st->execute([':id' => (int)$id]);
-        $row = $st->fetch();
+        $row = $st->fetch(PDO::FETCH_ASSOC);
         if (!$row) return null;
 
+        $row['answers'] = $this->loadResultDetailsAnswers((int)$id);
         return $this->toJson($row);
+    }
+
+    /** @return array<string,string> question_id => selected_ans_id từ result_details */
+    private function loadResultDetailsAnswers(int $resultId): array
+    {
+        $st = $this->pdo->prepare('SELECT question_id, selected_ans_id FROM result_details WHERE result_id = :rid ORDER BY id');
+        $st->execute([':rid' => $resultId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $qid = (string)($r['question_id'] ?? '');
+            $aid = (string)($r['selected_ans_id'] ?? '');
+            if ($qid !== '') {
+                $out[$qid] = $aid;
+            }
+        }
+        return $out;
     }
 
     public function countDocuments(array $filter): int
@@ -103,8 +120,53 @@ final class ExamAttemptModel
         }
         $st->execute();
         $newId = (string)$st->fetchColumn();
+        $resultId = (int)$newId;
+
+        $answers = $data['answers'] ?? [];
+        if (is_array($answers) && $answers !== []) {
+            $this->saveResultDetails($resultId, $answers);
+        }
+
         $created = $this->findById($newId);
         return $created ?? ['id' => $newId] + $payload;
+    }
+
+    /**
+     * Lưu từng đáp án đã chọn vào result_details (schema questions3).
+     * @param array<string|int, string|int> $answers question_id => selected_ans_id
+     */
+    private function saveResultDetails(int $resultId, array $answers): void
+    {
+        $ansIds = array_values(array_map('intval', array_filter($answers, static fn($v) => $v !== null && $v !== '')));
+        if ($ansIds === []) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($ansIds), '?'));
+        $st = $this->pdo->prepare("SELECT id, is_correct FROM answers WHERE id IN ({$placeholders})");
+        $st->execute(array_values($ansIds));
+        $correctMap = [];
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $correctMap[(string)$row['id']] = !empty($row['is_correct']);
+        }
+
+        $ins = $this->pdo->prepare(
+            'INSERT INTO result_details (result_id, question_id, selected_ans_id, is_correct, score) VALUES (:rid, :qid, :aid, CAST(:correct AS boolean), :score)'
+        );
+        foreach ($answers as $questionId => $selectedAnsId) {
+            $qid = (int)$questionId;
+            $aid = (int)$selectedAnsId;
+            if ($qid <= 0 || $aid <= 0) {
+                continue;
+            }
+            $isCorrect = $correctMap[(string)$selectedAnsId] ?? false;
+            $score = $isCorrect ? 1.00 : 0.00;
+            $ins->bindValue(':rid', $resultId, PDO::PARAM_INT);
+            $ins->bindValue(':qid', $qid, PDO::PARAM_INT);
+            $ins->bindValue(':aid', $aid, PDO::PARAM_INT);
+            $ins->bindValue(':correct', $isCorrect ? 1 : 0, PDO::PARAM_INT);
+            $ins->bindValue(':score', $score, PDO::PARAM_STR);
+            $ins->execute();
+        }
     }
 
     /** @return array<string,mixed>|null */

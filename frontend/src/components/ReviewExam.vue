@@ -12,7 +12,10 @@ const exam = ref(null)
 const loading = ref(true)
 const error = ref(null)
 
-const answerMap = ['A', 'B', 'C', 'D']
+const answerLabels = ['A', 'B', 'C', 'D', 'E', 'F']
+function getAnswerLabelByIndex(q, idx) {
+  return answerLabels[idx] ?? String(idx + 1)
+}
 
 const questions = computed(() => {
   const qs = attempt.value?.questions ?? exam.value?.questions
@@ -35,14 +38,26 @@ function getAnswerLabel(q, idx) {
   return ''
 }
 
+/** Chỉ số đáp án đúng (0-based). Schema questions3: dùng answers[].is_correct hoặc correctAnswer/correct_answer */
 function correctIndex(q) {
+  const ans = q.answers || q.options
+  if (Array.isArray(ans)) {
+    const idx = ans.findIndex((a) => a?.is_correct === true)
+    if (idx >= 0) return idx
+  }
   return Number(q.correctAnswer ?? q.correct_answer ?? 0)
 }
 
+/** Chỉ số đáp án học sinh chọn (0-based). attempt.answers lưu theo questionId -> answerId */
 function userChoice(q) {
-  const id = q.id
-  const v = userAnswers.value[id]
-  return v === null || v === undefined ? null : Number(v)
+  const selectedId = userAnswers.value[q.id]
+  if (selectedId === null || selectedId === undefined || selectedId === '') return null
+  const ans = q.answers || q.options
+  if (Array.isArray(ans)) {
+    const idx = ans.findIndex((a) => String(a?.id) === String(selectedId))
+    if (idx >= 0) return idx
+  }
+  return Number(selectedId)
 }
 
 async function loadAttempt() {
@@ -65,7 +80,11 @@ async function loadAttempt() {
   const examId = att.exam_id ?? att.examId
   if (examId) {
     const examRes = await studentApi.getExamById(examId)
-    if (examRes.ok) exam.value = examRes.data?.exam ?? examRes.data
+    if (examRes.ok) {
+      const examData = examRes.data?.exam ?? examRes.data
+      const qs = examRes.data?.questions ?? []
+      exam.value = { ...examData, questions: qs }
+    }
   }
   loading.value = false
 }
@@ -82,7 +101,11 @@ watch(
 )
 
 const examTitle = computed(() => exam.value?.title ?? exam.value?.name ?? attempt.value?.title ?? 'Đề thi')
-const examDuration = computed(() => exam.value?.duration ?? attempt.value?.duration ?? '-')
+const examDuration = computed(() => {
+  const d = exam.value?.duration ?? attempt.value?.duration
+  if (d == null || d === '' || Number(d) === 0) return 'Không giới hạn'
+  return d
+})
 const attemptDurationText = computed(() => {
   const a = attempt.value
   if (!a) return '-'
@@ -116,63 +139,62 @@ const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?
   <div
     class="w-full max-w-6xl bg-white/90 rounded-2xl shadow-xl p-8 mt-20 animate-fade-in text-black my-10"
   >
-    <div class="flex flex-col md:flex-row gap-8">
-      <!-- Thông tin đề thi bên trái -->
-      <div class="md:w-1/3 w-full flex-shrink-0 mb-8 md:mb-0">
-        <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ examTitle }}</h2>
-        <div class="mb-4 text-gray-700">
-          <b>Thời gian đề:</b> {{ examDuration }} phút<br />
-          <b>Thời gian làm bài:</b> {{ attemptDurationText }}<br />
-          <b>Số câu hỏi:</b> {{ totalQuestions }}<br />
-          <b>Điểm:</b> {{ resultScore }}<br />
-          <b>Ngày nộp:</b> {{ submittedAt }}
-        </div>
+    <!-- Box tóm tắt đề thi (phía trên) -->
+    <div class="border border-indigo-200 rounded-xl bg-indigo-50/50 p-6 mb-8">
+      <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ examTitle }}</h2>
+      <div class="text-gray-700">
+        <b>Thời gian đề:</b> {{ examDuration === 'Không giới hạn' ? examDuration : examDuration + ' phút' }}<br />
+        <b>Thời gian làm bài:</b> {{ attemptDurationText }}<br />
+        <b>Số câu hỏi:</b> {{ totalQuestions }}<br />
+        <b>Điểm:</b> {{ resultScore }}<br />
+        <b>Ngày nộp:</b> {{ submittedAt }}
       </div>
-      <!-- Các câu hỏi bên phải -->
-      <div class="md:w-2/3 w-full">
-        <div class="question-list flex flex-col gap-6">
-          <div
-            v-for="(question, i) in questions"
-            :key="question.id"
-            class="question-block border-b border-gray-200 pb-4"
+    </div>
+
+    <!-- Bài làm của học sinh: từng câu hỏi + đáp án đúng / đáp án bạn chọn -->
+    <h3 class="text-xl font-bold text-indigo-700 mb-4">Bài làm của học sinh</h3>
+    <p v-if="questions.length === 0" class="text-gray-500">Không có câu hỏi trong bài làm này.</p>
+    <div v-else class="question-list flex flex-col gap-6">
+      <div
+        v-for="(question, i) in questions"
+        :key="question.id"
+        class="question-block border border-gray-200 rounded-lg p-4 bg-slate-50/80"
+      >
+        <div class="mb-2 font-medium">
+          <b>Câu {{ i + 1 }}:</b> {{ question.question || question.content }}
+        </div>
+        <ul class="answers mb-2 space-y-1">
+          <li
+            v-for="(_, idx) in (question.answers || question.options || [])"
+            :key="idx"
+            class="flex items-center gap-2 flex-wrap"
           >
-            <div class="mb-2">
-              <b>Câu {{ i + 1 }}:</b> {{ question.question || question.content }}
-            </div>
-            <ul class="answers mb-2">
-              <li
-                v-for="(label, idx) in answerMap"
-                :key="label"
-                class="flex items-center gap-2 mb-1"
+            <span>{{ getAnswerLabelByIndex(question, idx) }}. {{ getAnswerLabel(question, idx) }}</span>
+            <span v-if="correctIndex(question) === idx" class="text-green-600 font-medium">✓ Đáp án đúng</span>
+            <span v-if="userChoice(question) !== null && userChoice(question) === idx">
+              <span
+                v-if="userChoice(question) === correctIndex(question)"
+                class="text-green-700 font-bold"
               >
-                <span>{{ label }}. {{ getAnswerLabel(question, idx) }}</span>
-                <span v-if="correctIndex(question) === idx" class="text-green-600">✓</span>
-                <span v-if="userChoice(question) !== null && userChoice(question) === idx">
-                  <span
-                    v-if="userChoice(question) === correctIndex(question)"
-                    class="text-green-700 font-bold"
-                  >
-                    (Bạn chọn)
-                  </span>
-                  <span v-else class="text-red-600 font-bold">(Bạn chọn)</span>
-                </span>
-              </li>
-            </ul>
-            <div class="mt-1">
-              <b>Đáp án đúng:</b> {{ answerMap[correctIndex(question)] }}
-              <span v-if="userChoice(question) !== null">
-                | <b>Đáp án của bạn:</b> {{ answerMap[userChoice(question)] }}
-                <span
-                  v-if="userChoice(question) === correctIndex(question)"
-                  class="text-green-600 ml-2"
-                >
-                  ✓ Đúng
-                </span>
-                <span v-else class="text-red-600 ml-2">✗ Sai</span>
+                (Bạn chọn · Đúng)
               </span>
-              <span v-else class="text-red-600 ml-2">Bạn chưa trả lời câu này.</span>
-            </div>
-          </div>
+              <span v-else class="text-red-600 font-bold">(Bạn chọn · Sai)</span>
+            </span>
+          </li>
+        </ul>
+        <div class="mt-2 pt-2 border-t border-gray-200 text-sm">
+          <b>Đáp án đúng:</b> {{ getAnswerLabelByIndex(question, correctIndex(question)) }}. {{ getAnswerLabel(question, correctIndex(question)) }}
+          <template v-if="userChoice(question) !== null">
+            | <b>Đáp án của bạn:</b> {{ getAnswerLabelByIndex(question, userChoice(question)) }}. {{ getAnswerLabel(question, userChoice(question)) }}
+            <span
+              v-if="userChoice(question) === correctIndex(question)"
+              class="text-green-600 ml-1"
+            >
+              ✓ Đúng
+            </span>
+            <span v-else class="text-red-600 ml-1">✗ Sai</span>
+          </template>
+          <span v-else class="text-amber-600 ml-1">— Bạn chưa trả lời câu này.</span>
         </div>
       </div>
     </div>
