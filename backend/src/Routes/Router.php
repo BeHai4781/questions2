@@ -12,6 +12,7 @@ use App\Controllers\UserController;
 use App\Middleware\Auth;
 use App\Middleware\Validator;
 use App\Utils\Response;
+use App\Controllers\QuestionBankController;
 
 final class Router
 {
@@ -338,6 +339,83 @@ final class Router
             if (!ctype_digit($id)) $messages[] = 'Invalid question id';
             Validator::failIf($messages);
             QuestionController::deleteQuestion($id, $user);
+        });
+
+        // ── Question Bank routes (/api/question-bank) ────────────────────────
+
+        $this->map('GET', '/api/question-bank', function () {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            $messages = [];
+            $this->validatePagination($_GET, $messages);
+            if (isset($_GET['createdBy']) && !ctype_digit((string)$_GET['createdBy'])) {
+                $messages[] = 'createdBy must be a numeric id';
+            }
+            if (isset($_GET['classId']) && !ctype_digit((string)$_GET['classId'])) {
+                $messages[] = 'classId must be a numeric id';
+            }
+            if (isset($_GET['levelId']) && !ctype_digit((string)$_GET['levelId'])) {
+                $messages[] = 'levelId must be a numeric id';
+            }
+            $this->validateOptionalString($_GET['search'] ?? null, 'search', 0, 200, $messages);
+            Validator::failIf($messages);
+            QuestionBankController::getQuestions($_GET, $user);
+        });
+
+        $this->map('GET', '/api/question-bank/:id', function (string $id) {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            $messages = [];
+            if (!ctype_digit($id)) $messages[] = 'Invalid question bank id';
+            Validator::failIf($messages);
+            QuestionBankController::getQuestionById($id, $user);
+        });
+
+        $this->map('POST', '/api/question-bank', function () {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            $body = $this->jsonBody();
+            $messages = [];
+            if (trim((string)($body['content'] ?? '')) === '') {
+                $messages[] = 'content is required';
+            }
+            $this->validateOptionalString($body['content'] ?? null, 'content', 1, 5000, $messages);
+            if (isset($body['classId']) && !ctype_digit((string)$body['classId'])) {
+                $messages[] = 'classId must be a numeric id';
+            }
+            if (isset($body['levelId']) && !ctype_digit((string)$body['levelId'])) {
+                $messages[] = 'levelId must be a numeric id';
+            }
+            $this->validateOptionalArray($body['answers'] ?? null, 'answers', $messages);
+            Validator::failIf($messages);
+            QuestionBankController::createQuestion($body, $user);
+        });
+
+        $this->map('PUT', '/api/question-bank/:id', function (string $id) {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            $body = $this->jsonBody();
+            $messages = [];
+            if (!ctype_digit($id)) $messages[] = 'Invalid question bank id';
+            $this->validateOptionalString($body['content'] ?? null, 'content', 1, 5000, $messages);
+            if (isset($body['classId']) && !ctype_digit((string)$body['classId'])) {
+                $messages[] = 'classId must be a numeric id';
+            }
+            if (isset($body['levelId']) && !ctype_digit((string)$body['levelId'])) {
+                $messages[] = 'levelId must be a numeric id';
+            }
+            $this->validateOptionalArray($body['answers'] ?? null, 'answers', $messages);
+            Validator::failIf($messages);
+            QuestionBankController::updateQuestion($id, $body, $user);
+        });
+
+        $this->map('DELETE', '/api/question-bank/:id', function (string $id) {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            $messages = [];
+            if (!ctype_digit($id)) $messages[] = 'Invalid question bank id';
+            Validator::failIf($messages);
+            QuestionBankController::deleteQuestion($id, $user);
         });
 
         $this->map('GET', '/api/exam-attempts', function () {

@@ -48,6 +48,10 @@ const router = createRouter({
       component: () => import('../pages/teachers/ExamResultsPage.vue'),
     },
     {
+      path: '/teacher/profile',
+      component: () => import('../pages/ProfilePage.vue'),
+    },
+    {
       path: '/admin/dashboard',
       component: () => import('../pages/admins/AdminDashboardPage.vue'),
     },
