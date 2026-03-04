@@ -15,9 +15,9 @@
         </button>
       </div>
 
-      <!-- Chi tiết thông báo -->
-      <div v-if="detailNotification" class="mb-6">
-        <div class="bg-gray-50 border rounded-xl shadow p-6 mb-2">
+      <!-- Modal chi tiết thông báo -->
+      <div v-if="detailNotification" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div class="bg-white border rounded-xl shadow-lg p-6 w-full max-w-lg animate-fade-in">
           <h3 class="font-semibold mb-2 text-lg">
             Chi tiết thông báo ({{ detailNotification.type }})
           </h3>
@@ -40,7 +40,7 @@
             <strong>Nội dung:</strong> {{ detailNotification.content }}
           </p>
           <p class="text-gray-500">Gửi lúc: {{ detailNotification.created_at }}</p>
-          <div class="flex gap-2 mt-4">
+          <div class="flex gap-2 mt-4 justify-end">
             <button
               class="bg-red-400 text-white text-sm rounded px-4 py-2 hover:bg-red-700 transition"
               @click="deleteNotification(detailNotification.id)"
@@ -73,7 +73,7 @@
           </thead>
           <tbody>
             <tr v-for="notice in pagedApproval" :key="notice.id" class="hover:bg-indigo-50">
-              <td class="px-2 py-2 border font-bold">{{ notice.fullname || 'Chưa có tên' }}</td>
+              <td class="px-2 py-2 border font-bold">{{ notice.email || 'Chưa có tên' }}</td>
               <td class="px-2 py-2 border">{{ notice.created_at }}</td>
               <td class="px-2 py-2 border text-center">
                 <span v-if="!notice.is_read" class="badge bg-red-500 text-white">Mới</span>
@@ -145,7 +145,7 @@
           </thead>
           <tbody>
             <tr v-for="notice in pagedNewPost" :key="notice.id" class="hover:bg-indigo-50">
-              <td class="px-2 py-2 border font-bold">{{ notice.username || 'Unknown' }}</td>
+              <td class="px-2 py-2 border font-bold">{{ notice.email || 'Unknown' }}</td>
               <td class="px-2 py-2 border">{{ notice.exam_title || 'Chưa có tiêu đề' }}</td>
               <td class="px-2 py-2 border">{{ notice.created_at }}</td>
               <td class="px-2 py-2 border text-center">
@@ -275,47 +275,37 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
 
 // Dữ liệu mẫu
-const approvalNotifications = ref([
-  { id: 1, fullname: 'Nguyễn Văn A', user_id: 101, created_at: '2023-12-01', is_read: false },
-  { id: 2, fullname: 'Trần Thị B', user_id: 102, created_at: '2023-12-02', is_read: true },
-])
-const newPostNotifications = ref([
-  {
-    id: 3,
-    username: 'teacher1',
-    exam_title: 'Đề thi Toán',
-    created_at: '2023-12-03',
-    is_read: false,
-  },
-  {
-    id: 4,
-    username: 'teacher2',
-    exam_title: 'Đề thi Văn',
-    created_at: '2023-12-04',
-    is_read: true,
-  },
-])
-const contactNotifications = ref([
-  {
-    id: 5,
-    email: 'user@email.com',
-    content: 'Tôi cần hỗ trợ về tài khoản.',
-    created_at: '2023-12-05',
-    is_read: false,
-  },
-  {
-    id: 6,
-    email: 'guest@email.com',
-    content: 'Làm sao để đăng ký?',
-    created_at: '2023-12-06',
-    is_read: true,
-  },
-])
+
+const { getNotifications, markNotificationRead, markAllNotificationsRead } = useAdminApi()
+const fetchNotifications = async () => {
+  try {
+    const res = await getNotifications({ })
+    if (res.ok) {
+      // Xử lý dữ liệu nếu cần
+      console.log('Notifications:', res.data)
+      const notifications = res.data || []
+      // Phân loại thông báo
+      approvalNotifications.value = notifications.filter((n) => n.type === 'new_user')
+      newPostNotifications.value = notifications.filter((n) => n.type === 'new_exam')
+      contactNotifications.value = notifications.filter((n) => n.type === 'new_contact')
+    } else toast.error(res.error?.message || 'Lỗi tải thông báo')
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi tải thông báo')
+  }
+}
+onMounted(() => {
+  fetchNotifications()
+})
+const approvalNotifications = ref([])
+const newPostNotifications = ref([])
+const contactNotifications = ref([])
 
 const detailNotification = ref(null)
 
@@ -345,7 +335,7 @@ function viewDetail(notice, type) {
 function closeDetail() {
   detailNotification.value = null
 }
-function markRead(notice, type) {
+function markRead(notice) {
   notice.is_read = true
 }
 function markAllRead() {

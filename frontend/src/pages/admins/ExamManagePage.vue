@@ -31,11 +31,6 @@
             🔍
           </button>
         </div>
-        <button
-          class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition font-semibold"
-        >
-          ➕ Thêm đề thi
-        </button>
       </form>
 
       <div class="mb-3 text-left">
@@ -65,18 +60,26 @@
               <td class="px-3 py-2 border">{{ exam.total_questions }}</td>
               <td class="px-3 py-2 border text-center">
                 <button
-                  @click="deleteExam(exam.id)"
+                  @click="openDeleteModal(exam)"
                   class="bg-red-400 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-red-700 transition"
                   :disabled="deletingId === exam.id"
                 >
                   🗑️ Xoá
                 </button>
-                <button
-                  class="bg-blue-600 text-white text-sm rounded px-2 py-1 hover:bg-blue-700 transition"
-                >
-                  ✏️ Sửa
-                </button>
               </td>
+                  <!-- Delete Confirm Modal -->
+                  <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm animate-fade-in">
+                      <div class="text-lg font-semibold mb-4 text-red-600">Xác nhận xoá đề thi</div>
+                      <div class="mb-4">Bạn có chắc chắn muốn xoá đề thi <b>{{ examToDelete?.title }}</b> không?</div>
+                      <div class="flex justify-end gap-2">
+                        <button @click="showDeleteModal = false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Huỷ</button>
+                        <button @click="confirmDeleteExam" :disabled="deletingId === examToDelete?.id" class="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-700">
+                          Xoá
+                        </button>
+                      </div>
+                    </div>
+                  </div>
             </tr>
           </tbody>
         </table>
@@ -109,44 +112,21 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
-
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
 // Dữ liệu mẫu
-const exams = ref([
-  {
-    id: 1,
-    title: 'Đề thi Toán',
-    creator: 'teacher1',
-    created_at: '2023-12-01',
-    duration: 60,
-    total_questions: 40,
-  },
-  {
-    id: 2,
-    title: 'Đề thi Văn',
-    creator: 'teacher2',
-    created_at: '2023-12-10',
-    duration: 45,
-    total_questions: 30,
-  },
-  {
-    id: 3,
-    title: 'Đề thi Anh',
-    creator: 'teacher3',
-    created_at: '2023-12-15',
-    duration: 50,
-    total_questions: 35,
-  },
-  // ...more data
-])
-
+const exams = ref([])
 const searchTitle = ref('')
 const searchCreator = ref('')
 const deletingId = ref(null)
+const showDeleteModal = ref(false)
+const examToDelete = ref(null)
 const currentPage = ref(1)
 const pageSize = 5
+const { getExams, deleteExam } = useAdminApi()
 
 const filteredExams = computed(() => {
   return exams.value.filter(
@@ -166,22 +146,46 @@ function searchExams() {
   currentPage.value = 1
 }
 
-function deleteExam(id) {
-  if (confirm('Xoá đề thi này?')) {
-    deletingId.value = id
-    setTimeout(() => {
-      exams.value = exams.value.filter((e) => e.id !== id)
-      deletingId.value = null
-    }, 500) // Simulate API delay
+
+function openDeleteModal(exam) {
+  examToDelete.value = exam
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteExam() {
+  if (!examToDelete.value) return
+  deletingId.value = examToDelete.value.id
+  try {
+    const res = await deleteExam(examToDelete.value.id)
+    if (res.ok) {
+      exams.value = exams.value.filter((e) => e.id !== examToDelete.value.id)
+      showDeleteModal.value = false
+      examToDelete.value = null
+      toast.success('Xoá đề thi thành công')
+    } else {
+      toast.error(res.error?.message || 'Lỗi xoá đề thi')
+    }
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi xoá đề thi')
+  } finally {
+    deletingId.value = null
   }
 }
+
+const fetchExams = async () => {
+  try {
+    const res = await getExams({ page: 1, limit: 100 })
+    if (res.ok) exams.value = res.data ?? []
+    else toast.error(res.error?.message || 'Lỗi tải đề thi')
+    console.log('Exams:', exams.value)
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi tải đề thi')
+  }
+}
+
+onMounted(() => {
+  fetchExams()
+})
 </script>
 
-<style scoped>
-.btn {
-  transition: background 0.2s;
-}
-.btn-danger:hover {
-  background: #dc2626;
-}
-</style>
+

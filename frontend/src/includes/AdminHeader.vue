@@ -1,20 +1,42 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 const unread = ref(3) // Số thông báo chưa đọc (demo)
-const notifications = ref([
-  { type: 'new_user', fullname: 'Nguyễn Văn A', created_at: '2025-12-18 10:00' },
-  {
-    type: 'new_exam',
-    username: 'teacher01',
-    exam_title: 'Toán 12 HK1',
-    created_at: '2025-12-17 15:30',
-  },
-  { type: 'new_contact', email_client: 'user@email.com', created_at: '2025-12-16 09:20' },
-])
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const displayName = () => authStore.user?.fullname || authStore.user?.username || 'Tài khoản'
+const { getNotifications } = useAdminApi()
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/login')
+}
+const notifications = ref([])
 const showDropdown = ref(false)
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value
 }
+
+const fetchNotifications = async () => {
+  try {
+    const res = await getNotifications({ page: 1, limit: 100 })
+    if (res.ok) notifications.value = res.data ?? []
+    else toast.error(res.error?.message || 'Lỗi tải thông báo')
+    console.log('Notifications:', notifications.value)
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi tải thông báo')
+    console.log('Error fetching notifications:', e)
+  }
+}
+
+onMounted(() => {
+  fetchNotifications()
+})
+
 const closeDropdown = (e) => {
   if (!e.target.closest('.notification-bell') && !e.target.closest('.notification-dropdown')) {
     showDropdown.value = false
@@ -38,7 +60,7 @@ if (typeof window !== 'undefined') {
         <a href="/admin/users" class="hover:text-indigo-600 transition">Người dùng</a>
         <a href="/admin/exams" class="hover:text-indigo-600 transition">Đề thi</a>
         <a href="/admin/questions" class="hover:text-indigo-600 transition">Câu hỏi</a>
-        <a href="/admin/reports" class="hover:text-indigo-600 transition">Báo cáo</a>
+        <a href="/admin/notifications" class="hover:text-indigo-600 transition">Thông báo</a>
       </nav>
     </div>
     <div class="flex items-center gap-4">
@@ -65,25 +87,25 @@ if (typeof window !== 'undefined') {
           <ul v-else class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
             <li v-for="(n, idx) in notifications" :key="idx" class="p-3 hover:bg-indigo-50">
               <template v-if="n.type === 'new_user'">
-                🟢 <span class="font-semibold">{{ n.fullname }}</span> đã tham gia.
+                🟢 <span class="font-semibold">{{ n.email }}</span> đã tham gia.
                 <a href="/admin/users" class="text-indigo-600 ml-2">Xem</a>
               </template>
               <template v-else-if="n.type === 'new_exam'">
-                📝 <span class="font-semibold">{{ n.username }}</span> đã tạo đề thi mới:
+                📝 <span class="font-semibold">{{ n.email }}</span> đã tạo đề thi mới:
                 <span class="font-semibold">{{ n.exam_title }}</span
                 >.
                 <a href="/admin/exams" class="text-indigo-600 ml-2">Xem</a>
               </template>
               <template v-else-if="n.type === 'new_contact'">
                 📩 <span class="font-semibold">{{ n.email_client }}</span> vừa gửi liên hệ.
-                <a href="/admin/reports" class="text-indigo-600 ml-2">Xem</a>
+                <a href="/admin/notifications" class="text-indigo-600 ml-2">Xem</a>
               </template>
               <template v-else> Thông báo: {{ n.content }} </template>
               <div class="text-xs text-gray-400 mt-1">{{ n.created_at }}</div>
             </li>
           </ul>
           <div class="p-2 text-center border-t border-gray-100">
-            <a href="/admin/reports" class="text-indigo-600 hover:underline"
+            <a href="/admin/notifications" class="text-indigo-600 hover:underline"
               >Xem tất cả thông báo</a
             >
           </div>
@@ -99,7 +121,7 @@ if (typeof window !== 'undefined') {
           <div class="w-8 h-8 rounded-full overflow-hidden border border-indigo-200">
             <img alt="Avatar" src="/avatar.png" class="w-full h-full object-cover" />
           </div>
-          <span class="hidden md:inline">Admin</span>
+          <span class="hidden md:inline">{{ displayName() }}</span>
           <svg
             class="w-4 h-4 ml-1 text-indigo-500"
             fill="none"
@@ -115,13 +137,10 @@ if (typeof window !== 'undefined') {
           class="menu dropdown-content bg-white text-black rounded-box z-10 mt-3 w-40 p-2 shadow text-sm border border-gray-200 absolute right-0"
         >
           <li class="hover:bg-indigo-100 hover:text-indigo-700 hover:font-bold rounded">
-            <a href="/admin/profile">Trang cá nhân</a>
+            <a href="/profile">Trang cá nhân</a>
           </li>
           <li class="hover:bg-indigo-100 hover:text-indigo-700 hover:font-bold rounded">
-            <a href="/admin/settings">Cài đặt</a>
-          </li>
-          <li class="hover:bg-indigo-100 hover:text-indigo-700 hover:font-bold rounded">
-            <a href="/logout">Đăng xuất</a>
+            <a href="#" @click.prevent="handleLogout">Đăng xuất</a>
           </li>
         </ul>
       </div>

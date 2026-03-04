@@ -1,12 +1,21 @@
 <script setup>
 import { ref } from 'vue'
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
+
+
+const {createUser} = useAdminApi()
 const props = defineProps({
   visible: Boolean,
   close: Function,
 })
+const emit = defineEmits(['created'])
+
 
 const fullname = ref('')
 const username = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 const email = ref('')
 const phone = ref('')
 const role = ref('student')
@@ -15,6 +24,8 @@ const errors = ref([])
 function resetForm() {
   fullname.value = ''
   username.value = ''
+  password.value = ''
+  confirmPassword.value = ''
   email.value = ''
   phone.value = ''
   role.value = 'student'
@@ -26,14 +37,32 @@ function closeModal() {
   props.close()
 }
 
-function submitForm() {
+async function submitForm() {
   errors.value = []
   if (!fullname.value) errors.value.push('Vui lòng nhập họ tên.')
   if (!username.value) errors.value.push('Vui lòng nhập tên đăng nhập.')
+  if (!password.value) errors.value.push('Vui lòng nhập mật khẩu.')
+  if (!confirmPassword.value) errors.value.push('Vui lòng xác nhận mật khẩu.')
+  if (password.value && confirmPassword.value && password.value !== confirmPassword.value) errors.value.push('Mật khẩu xác nhận không khớp.')
   if (!email.value) errors.value.push('Vui lòng nhập email.')
   if (!phone.value) errors.value.push('Vui lòng nhập số điện thoại.')
   if (errors.value.length) return
-
+  const res = await createUser({
+    fullname: fullname.value,
+    username: username.value,
+    password: password.value,
+    email: email.value,
+    phone: phone.value,
+    role: role.value,
+  })
+  if (!res.ok) {
+    errors.value.push(res.error?.message || 'Lỗi tạo tài khoản')
+    toast.error(errors.value.join('\n'))
+    return
+  }
+  toast.success(`Đã tạo tài khoản ${fullname.value}`)
+  emit('created')
+  props.close() 
   resetForm()
 }
 </script>

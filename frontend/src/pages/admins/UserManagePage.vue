@@ -1,58 +1,96 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
 import CreateUserModal from '@/components/CreateUserModal.vue'
 import EditUserModal from '@/components/EditUserModal.vue'
-
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
+import { useAuthStore } from '@/stores/auth'
+const { getUsers, updateUser, deleteUser } = useAdminApi()
+const userId = useAuthStore().user?.id
 // Dữ liệu mẫu
-const allUsers = [
-  {
-    id: 1,
-    fullname: 'Nguyễn Văn A',
-    email: 'a@email.com',
-    phone: '0123456789',
-    username: 'nguyenvana',
-    role: 'student',
-    status: 'active',
-  },
-  {
-    id: 2,
-    fullname: 'Trần Thị B',
-    email: 'b@email.com',
-    phone: '0987654321',
-    username: 'tranthib',
-    role: 'teacher',
-    status: 'banned',
-  },
-  {
-    id: 3,
-    fullname: 'Lê Văn C',
-    email: 'c@email.com',
-    phone: '0111222333',
-    username: 'levanc',
-    role: 'admin',
-    status: 'active',
-  },
-  {
-    id: 4,
-    fullname: 'Phạm Thị D',
-    email: 'd@email.com',
-    phone: '0222333444',
-    username: 'phamthid',
-    role: 'student',
-    status: 'banned',
-  },
-  {
-    id: 5,
-    fullname: 'Hoàng Văn E',
-    email: 'e@email.com',
-    phone: '0333444555',
-    username: 'hoangvane',
-    role: 'teacher',
-    status: 'active',
-  },
-]
+const allUsers = ref([])
+const fetchUsers = async () => {
+  const res = await getUsers()
+  console.log('getUsers res', res)
+  if (res.ok) allUsers.value = res.data ?? []
+}
+
+
+// Modal xác nhận thao tác
+const confirmModalVisible = ref(false)
+const confirmAction = ref(null)
+const confirmUser = ref(null)
+const confirmMessage = ref('')
+
+function showConfirmModal(action, user, message) {
+  confirmAction.value = action
+  confirmUser.value = user
+  confirmMessage.value = message
+  confirmModalVisible.value = true
+}
+
+async function handleConfirm() {
+  if (!confirmAction.value || !confirmUser.value) return
+  if (confirmAction.value === 'lock') {
+    await updateUser(confirmUser.value.id, { ...confirmUser.value, status: 'banned' })
+    allUsers.value = allUsers.value.map((u) =>
+      u.id === confirmUser.value.id ? { ...u, status: 'banned' } : u,
+    )
+    toast.success(`Đã khóa tài khoản ${confirmUser.value.fullname}`)
+    console.log('Khóa tài khoản', confirmUser.value)
+  } else if (confirmAction.value === 'unlock') {
+    await updateUser(confirmUser.value.id, { ...confirmUser.value, status: 'actived' })
+    allUsers.value = allUsers.value.map((u) =>
+      u.id === confirmUser.value.id ? { ...u, status: 'actived' } : u,
+    )
+    toast.success(`Đã mở khóa tài khoản ${confirmUser.value.fullname}`)
+    console.log('Mở khóa tài khoản', confirmUser.value)
+  } else if (confirmAction.value === 'delete') {
+    // Gọi API xóa tài khoản
+    await deleteUser(confirmUser.value.id)
+    allUsers.value = allUsers.value.filter((u) => u.id !== confirmUser.value.id)
+    toast.success(`Đã xóa tài khoản ${confirmUser.value.fullname}`)
+    console.log('Xóa tài khoản', confirmUser.value)
+  }
+  confirmModalVisible.value = false
+}
+
+function handleCancel() {
+  confirmModalVisible.value = false
+}
+
+const lockUser = (user) => {
+  //Không thể tự khoá bản thân
+  if (user.id === userId) {
+    toast.error('Bạn không thể khóa tài khoản của chính mình!')
+    return
+  }
+  showConfirmModal('lock', user, `Bạn có chắc chắn muốn khóa tài khoản ${user.fullname}?`)
+}
+
+const unlockUser = (user) => {
+  //Không thể tự mở khóa bản thân
+  if (user.id === userId) {
+    toast.error('Bạn không thể mở khóa tài khoản của chính mình!')
+    return
+  }
+  showConfirmModal('unlock', user, `Bạn có chắc chắn muốn mở khóa tài khoản ${user.fullname}?`)
+}
+
+const deleteUserById = (user) => {
+  //Không thể tự xóa bản thân
+  if (user.id === userId) {
+    toast.error('Bạn không thể xóa tài khoản của chính mình!')
+    return
+  }
+  showConfirmModal('delete', user, `Bạn có chắc chắn muốn xóa tài khoản ${user.fullname}?`)
+}
+
+onMounted(() => {
+  fetchUsers()
+})  
 
 const duyetMode = ref(true) // true: đang hoạt động, false: bị cấm
 const search = ref('')
@@ -60,7 +98,7 @@ const page = ref(1)
 const limit = 5
 
 const filteredUsers = computed(() => {
-  let users = allUsers.filter((u) =>
+  let users = allUsers.value.filter((u) =>
     duyetMode.value ? u.status === 'actived' : u.status === 'banned',
   )
   if (search.value.trim()) {
@@ -203,11 +241,13 @@ const closeEditUserModal = () => {
                 <template v-if="!duyetMode">
                   <button
                     class="bg-green-400 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-green-500 transition"
+                    @click="unlockUser(user)"
                   >
                     🔓 Mở khóa
                   </button>
                   <button
                     class="bg-red-400 text-white text-sm rounded px-2 py-1 hover:bg-red-700 transition"
+                    @click="deleteUserById(user)"
                   >
                     🗑️ Xóa
                   </button>
@@ -215,6 +255,7 @@ const closeEditUserModal = () => {
                 <template v-else>
                   <button
                     class="bg-yellow-600 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-yellow-700 transition"
+                    @click="lockUser(user)"
                   >
                     🔒 Vô hiệu hoá
                   </button>
@@ -255,6 +296,18 @@ const closeEditUserModal = () => {
     </div>
     <AppFooter />
   </div>
-  <CreateUserModal :visible="createUserModalVisible" :close="closeCreateUserModal" />
-  <EditUserModal :visible="editUserModalVisible" @close="closeEditUserModal" :user="selectedUser" />
+  <CreateUserModal :visible="createUserModalVisible" :close="closeCreateUserModal" @created="fetchUsers" />
+  <EditUserModal :visible="editUserModalVisible" @close="closeEditUserModal" :user="selectedUser" @update="fetchUsers"/>
+
+  <!-- Modal xác nhận thao tác -->
+  <div v-if="confirmModalVisible" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm animate-fade-in">
+      <div class="mb-4 text-lg font-semibold text-gray-800">Xác nhận thao tác</div>
+      <div class="mb-6 text-gray-700">{{ confirmMessage }}</div>
+      <div class="flex justify-end gap-2">
+        <button @click="handleCancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Huỷ</button>
+        <button @click="handleConfirm" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Xác nhận</button>
+      </div>
+    </div>
+  </div>
 </template>

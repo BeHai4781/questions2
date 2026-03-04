@@ -1,17 +1,20 @@
 <script setup>
+import { useAdminApi } from '@/composables/useAdminApi.js'
+const { updateUser } = useAdminApi()
 import { ref, watch} from 'vue'
+import { toast } from 'vue3-toastify'
 const props = defineProps({
   visible: Boolean,
   user: Object,
 })
 const emit = defineEmits(['close', 'update'])
-
 const fullname = ref('')
 const email = ref('')
 const phone = ref('')
 const status = ref('actived')
 const role = ref('student')
 const newPassword = ref('')
+const confirmPassword = ref('')
 const errors = ref([])
 
 watch(
@@ -24,6 +27,7 @@ watch(
       status.value = val.status || 'actived'
       role.value = val.role || 'student'
       newPassword.value = ''
+      confirmPassword.value = ''
       errors.value = []
     }
   },
@@ -38,16 +42,27 @@ function submitForm() {
   errors.value = []
   if (!fullname.value) errors.value.push('Vui lòng nhập họ tên.')
   if (!email.value) errors.value.push('Vui lòng nhập email.')
+  if (newPassword.value && newPassword.value.length < 6) errors.value.push('Mật khẩu mới phải có ít nhất 6 ký tự.')
+  if (confirmPassword.value && newPassword.value !== confirmPassword.value) errors.value.push('Mật khẩu xác nhận không khớp.')
   if (errors.value.length) return
-  emit('update', {
-    ...props.user,
+  const updatedData = {
     fullname: fullname.value,
     email: email.value,
     phone: phone.value,
     status: status.value,
     role: role.value,
-    newPassword: newPassword.value,
-  })
+  }
+  if (newPassword.value) updatedData.password = newPassword.value
+  updateUser(props.user.id, updatedData)
+    .then((res) => {
+      if (res.ok) {
+        emit('update')
+        closeModal()
+        toast.success('Cập nhật thông tin người dùng thành công!')
+      } else {
+        errors.value.push(res.error?.message || 'Lỗi cập nhật tài khoản')
+      }
+    })
 }
 </script>
 
@@ -149,6 +164,22 @@ function submitForm() {
             class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700"
           >
             Mật khẩu mới (để trống nếu không đổi)
+          </label>
+        </div>
+        <div class="form-group relative">
+          <input
+            v-model="confirmPassword"
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            placeholder=" "
+            class="peer px-5 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 outline-none bg-slate-50 text-black w-full"
+          />
+          <label
+            for="confirmPassword"
+            class="absolute left-5 -top-3 px-1 bg-slate-50 rounded-lg text-gray-500 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-focus:-top-3 peer-focus:text-sm peer-focus:bg-white peer-focus:rounded-lg peer-focus:px-1 peer-focus:text-indigo-700"
+          >
+            Xác nhận mật khẩu
           </label>
         </div>
         <div class="form-group">

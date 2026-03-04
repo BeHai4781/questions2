@@ -31,12 +31,6 @@
             🔍
           </button>
         </div>
-        <button
-          class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition font-semibold"
-          disabled
-        >
-          ➕ Thêm câu hỏi
-        </button>
       </form>
 
       <div class="mb-3 text-center">
@@ -64,19 +58,26 @@
               </td>
               <td class="px-3 py-2 border text-center">
                 <button
-                  @click="deleteQuestion(q.id)"
+                  @click="openDeleteModal(q)"
                   class="bg-red-400 text-white text-sm rounded px-2 py-1 mr-2 hover:bg-red-700 transition"
                   :disabled="deletingId === q.id"
                 >
                   🗑️ Xoá
                 </button>
-                <button
-                  class="bg-blue-600 text-white text-sm rounded px-2 py-1 hover:bg-blue-700 transition"
-                  disabled
-                >
-                  ✏️ Sửa
-                </button>
               </td>
+                  <!-- Delete Confirm Modal -->
+                  <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm animate-fade-in">
+                      <div class="text-lg font-semibold mb-4 text-red-600">Xác nhận xoá câu hỏi</div>
+                      <div class="mb-4">Bạn có chắc chắn muốn xoá câu hỏi <b>{{ questionToDelete?.question?.slice(0, 50) }}...</b> không?</div>
+                      <div class="flex justify-end gap-2">
+                        <button @click="showDeleteModal = false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Huỷ</button>
+                        <button @click="confirmDeleteQuestion" :disabled="deletingId === questionToDelete?.id" class="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-700">
+                          Xoá
+                        </button>
+                      </div>
+                    </div>
+                  </div>
             </tr>
           </tbody>
         </table>
@@ -109,50 +110,38 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
+import { useAdminApi } from '@/composables/useAdminApi.js'
+import { toast } from 'vue3-toastify'
 
 // Dữ liệu mẫu
-const questions = ref([
-  {
-    id: 1,
-    subject_name: 'Toán',
-    class_name: '12',
-    question: 'Giải phương trình bậc hai: x^2 - 5x + 6 = 0.',
-  },
-  {
-    id: 2,
-    subject_name: 'Văn',
-    class_name: '11',
-    question: 'Phân tích nhân vật Tràng trong Vợ nhặt.',
-  },
-  {
-    id: 3,
-    subject_name: 'Anh',
-    class_name: '10',
-    question: 'Write an essay about your favorite hobby.',
-  },
-  {
-    id: 4,
-    subject_name: 'Lý',
-    class_name: '12',
-    question: 'Trình bày định luật II Newton và lấy ví dụ minh hoạ.',
-  },
-  {
-    id: 5,
-    subject_name: 'Hoá',
-    class_name: '11',
-    question: 'Tính số mol của 22,4 lít khí oxi ở đktc.',
-  },
-  // ...more data
-])
-
+const questions = ref([])
+const { getQuestions, deleteQuestion } = useAdminApi()
 const searchSubject = ref('')
 const searchClass = ref('')
 const deletingId = ref(null)
+const showDeleteModal = ref(false)
+const questionToDelete = ref(null)
 const currentPage = ref(1)
 const pageSize = 5
+
+
+const fetchQuestions = async () => {
+  try {
+    const res = await getQuestions({ page: 1, limit: 100 })
+    if (res.ok) questions.value = res.data ?? []
+    else toast.error(res.error?.message || 'Lỗi tải câu hỏi')
+    console.log('Questions:', questions.value)
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi tải câu hỏi')
+  }
+}
+
+onMounted(() => {
+  fetchQuestions()
+})
 
 const filteredQuestions = computed(() => {
   return questions.value.filter(
@@ -173,13 +162,29 @@ function searchQuestions() {
   currentPage.value = 1
 }
 
-function deleteQuestion(id) {
-  if (confirm('Xoá câu hỏi này?')) {
-    deletingId.value = id
-    setTimeout(() => {
-      questions.value = questions.value.filter((q) => q.id !== id)
-      deletingId.value = null
-    }, 500) // Simulate API delay
+
+function openDeleteModal(q) {
+  questionToDelete.value = q
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteQuestion() {
+  if (!questionToDelete.value) return
+  deletingId.value = questionToDelete.value.id
+  try {
+    const res = await deleteQuestion(questionToDelete.value.id)
+    if (res.ok) {
+      questions.value = questions.value.filter((q) => q.id !== questionToDelete.value.id)
+      showDeleteModal.value = false
+      questionToDelete.value = null
+      toast.success('Đã xoá câu hỏi!')
+    } else {
+      toast.error(res.error?.message || 'Lỗi xoá câu hỏi')
+    }
+  } catch (e) {
+    toast.error(e?.message || 'Lỗi xoá câu hỏi')
+  } finally {
+    deletingId.value = null
   }
 }
 </script>
