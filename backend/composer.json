@@ -5,7 +5,9 @@
     "php": ">=8.1",
     "firebase/php-jwt": "^6.0",
     "ext-pdo": "*",
-    "ext-pdo_pgsql": "*"
+    "ext-pdo_pgsql": "*",
+    "phpoffice/phpword": "^1.4",
+    "phpoffice/phpspreadsheet": "^5.5"
   },
   "autoload": {
     "psr-4": {

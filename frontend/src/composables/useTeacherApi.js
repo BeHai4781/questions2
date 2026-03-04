@@ -30,5 +30,19 @@ export function useTeacherApi() {
     createQuestion:     (body)        => teacherApi.createQuestion(body, authHeaders()),
     updateQuestion:     (id, body)    => teacherApi.updateQuestion(id, body, authHeaders()),
     deleteQuestion:     (id)          => teacherApi.deleteQuestion(id, authHeaders()),
+
+    // ── Uploads ────────────────────────────────────────────
+    /**
+     * Upload file .docx/.xlsx → trả về mảng câu hỏi đọc được.
+     * @param {File} file
+     */
+    uploadExamFile:      (file)     => teacherApi.uploadExamFile(file, authHeaders()),
+
+    /**
+     * Upload ảnh câu hỏi → trả về { url: '/uploads/questions/...' }.
+     * @param {File} file
+     */
+    uploadQuestionImage: (file)     => teacherApi.uploadQuestionImage(file, authHeaders()),
+  
   }
 }
