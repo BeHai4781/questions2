@@ -9,8 +9,6 @@ use PDO;
 
 final class ExamAttemptModel
 {
-    private const TABLE = 'exam_results';
-
     private PDO $pdo;
     /** @var array<int,string>|null */
     private ?array $columns = null;
@@ -26,7 +24,8 @@ final class ExamAttemptModel
     {
         if (!ctype_digit($id)) return null;
 
-        $st = $this->pdo->prepare('SELECT * FROM ' . self::TABLE . ' WHERE id = :id LIMIT 1');
+        // Schema mới (questions3.sql): sử dụng bảng exam_results
+        $st = $this->pdo->prepare('SELECT * FROM exam_results WHERE id = :id LIMIT 1');
         $st->execute([':id' => (int)$id]);
         $row = $st->fetch();
         if (!$row) return null;
@@ -37,7 +36,7 @@ final class ExamAttemptModel
     public function countDocuments(array $filter): int
     {
         [$whereSql, $params] = $this->buildListWhere($filter);
-        $sql = 'SELECT COUNT(*) FROM ' . self::TABLE . ' ' . ($whereSql ? "WHERE {$whereSql}" : '');
+        $sql = 'SELECT COUNT(*) FROM exam_results ' . ($whereSql ? "WHERE {$whereSql}" : '');
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
         return (int)$st->fetchColumn();
@@ -47,9 +46,10 @@ final class ExamAttemptModel
     public function find(array $filter, int $skip, int $limit): array
     {
         [$whereSql, $params] = $this->buildListWhere($filter);
+        // exam_results có submit_time, duration_mins...
         $orderBy = $this->hasColumn('submit_time') ? 'submit_time DESC' : 'id DESC';
 
-        $sql = 'SELECT * FROM ' . self::TABLE . ' '
+        $sql = 'SELECT * FROM exam_results '
             . ($whereSql ? "WHERE {$whereSql} " : '')
             . "ORDER BY {$orderBy} OFFSET :skip LIMIT :limit";
 
@@ -75,30 +75,26 @@ final class ExamAttemptModel
         $map = [
             'examId' => 'exam_id',
             'userId' => 'student_id',
-            'result' => 'total_score',
+            'studentId' => 'student_id',
             'score' => 'total_score',
-            'totalScore' => 'total_score',
-            'totalQuestions' => 'total_questions',
-            'correctCount' => 'correct_count',
+            'result' => 'total_score',
             'durationMins' => 'duration_mins',
+            'duration' => 'duration_mins',
+            'time' => 'duration_mins',
+            'submittedAt' => 'submit_time',
+            'submitTime' => 'submit_time',
+            'startTime' => 'start_time',
         ];
 
         $payload = $this->filterData($data, $map);
 
-        if (!isset($payload['exam_id']) || !isset($payload['student_id'])) {
+        if (!$payload) {
             return [];
-        }
-
-        if ($this->hasColumn('submit_time') && !isset($payload['submit_time'])) {
-            $payload['submit_time'] = date('Y-m-d H:i:s');
-        }
-        if ($this->hasColumn('total_score') && !isset($payload['total_score'])) {
-            $payload['total_score'] = (float)($data['score'] ?? $data['result'] ?? 0);
         }
 
         $cols = array_keys($payload);
         $placeholders = array_map(fn($c) => ':' . $c, $cols);
-        $sql = 'INSERT INTO ' . self::TABLE . ' (' . implode(', ', $cols) . ')
+        $sql = 'INSERT INTO exam_results (' . implode(', ', $cols) . ')
                 VALUES (' . implode(', ', $placeholders) . ')
                 RETURNING id';
         $st = $this->pdo->prepare($sql);
@@ -119,13 +115,15 @@ final class ExamAttemptModel
         $map = [
             'examId' => 'exam_id',
             'userId' => 'student_id',
-            'result' => 'total_score',
+            'studentId' => 'student_id',
             'score' => 'total_score',
-            'totalScore' => 'total_score',
-            'totalQuestions' => 'total_questions',
-            'correctCount' => 'correct_count',
+            'result' => 'total_score',
             'durationMins' => 'duration_mins',
+            'duration' => 'duration_mins',
+            'time' => 'duration_mins',
+            'submittedAt' => 'submit_time',
             'submitTime' => 'submit_time',
+            'startTime' => 'start_time',
         ];
 
         $payload = $this->filterData($updates, $map);
@@ -139,7 +137,7 @@ final class ExamAttemptModel
             $set[] = "{$col} = :{$col}";
         }
 
-        $sql = 'UPDATE ' . self::TABLE . ' SET ' . implode(', ', $set) . ' WHERE id = :id';
+        $sql = 'UPDATE exam_results SET ' . implode(', ', $set) . ' WHERE id = :id';
         $st = $this->pdo->prepare($sql);
         $st->bindValue(':id', (int)$id, PDO::PARAM_INT);
         foreach ($payload as $k => $v) {
@@ -153,7 +151,7 @@ final class ExamAttemptModel
     public function deleteById(string $id): bool
     {
         if (!ctype_digit($id)) return false;
-        $st = $this->pdo->prepare('DELETE FROM ' . self::TABLE . ' WHERE id = :id');
+        $st = $this->pdo->prepare('DELETE FROM exam_results WHERE id = :id');
         $st->execute([':id' => (int)$id]);
         return $st->rowCount() > 0;
     }
@@ -163,14 +161,22 @@ final class ExamAttemptModel
     {
         $this->loadColumns();
         $row = $this->decodeJsonColumns($row);
-        if (isset($row['submit_time']) && $row['submit_time'] !== null) {
-            $row['submittedAt'] = is_string($row['submit_time']) ? $row['submit_time'] : (string)$row['submit_time'];
+        // Schema cũ: submitted_at; schema mới: submit_time
+        if (isset($row['submitted_at']) && $row['submitted_at'] !== null) {
+            $row['submittedAt'] = is_string($row['submitted_at']) ? $row['submitted_at'] : (string)$row['submitted_at'];
+        } elseif (isset($row['submit_time']) && $row['submit_time'] !== null) {
+            $row['submitted_at'] = is_string($row['submit_time']) ? $row['submit_time'] : (string)$row['submit_time'];
+            $row['submittedAt'] = $row['submitted_at'];
         }
-        if (isset($row['student_id']) && $row['student_id'] !== null) {
-            $row['user_id'] = (string)$row['student_id'];
+        if (isset($row['duration_mins'])) {
+            $row['durationMins'] = $row['duration_mins'];
         }
-        if (isset($row['total_score']) && $row['total_score'] !== null) {
-            $row['result'] = (float)$row['total_score'];
+        if (isset($row['total_score'])) {
+            $row['result'] = $row['total_score'];
+            $row['score'] = $row['total_score'];
+        }
+        if (isset($row['start_time']) && $row['start_time'] !== null) {
+            $row['startTime'] = is_string($row['start_time']) ? $row['start_time'] : (string)$row['start_time'];
         }
         if (isset($row['id'])) {
             $row['id'] = (string)$row['id'];
@@ -180,6 +186,10 @@ final class ExamAttemptModel
                 $row[$k] = (string)$v;
             }
         }
+        // Alias để controller/FE cũ dùng được với schema mới
+        if (isset($row['student_id']) && !isset($row['user_id'])) {
+            $row['user_id'] = $row['student_id'];
+        }
         return $row;
     }
 
@@ -188,7 +198,7 @@ final class ExamAttemptModel
         if ($this->columns !== null && $this->columnTypes !== null) return;
 
         $st = $this->pdo->prepare("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :t");
-        $st->execute([':t' => self::TABLE]);
+        $st->execute([':t' => 'exam_results']);
         $rows = $st->fetchAll() ?: [];
 
         $this->columns = [];
@@ -244,6 +254,7 @@ final class ExamAttemptModel
 
         $map = [
             'examId' => 'exam_id',
+            // userId từ FE map sang student_id trong exam_results
             'userId' => 'student_id',
         ];
         foreach ($map as $filterKey => $col) {

@@ -83,7 +83,30 @@ watch(
 
 const examTitle = computed(() => exam.value?.title ?? exam.value?.name ?? attempt.value?.title ?? 'Đề thi')
 const examDuration = computed(() => exam.value?.duration ?? attempt.value?.duration ?? '-')
-const attemptTime = computed(() => attempt.value?.time ?? '-')
+const attemptDurationText = computed(() => {
+  const a = attempt.value
+  if (!a) return '-'
+  const startRaw = a.start_time ?? a.startTime
+  const endRaw = a.submit_time ?? a.submittedAt ?? a.submitted_at
+  if (startRaw && endRaw) {
+    const startMs = Date.parse(startRaw)
+    const endMs = Date.parse(endRaw)
+    if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs >= startMs) {
+      const diffSec = Math.floor((endMs - startMs) / 1000)
+      const m = Math.floor(diffSec / 60)
+      const s = diffSec % 60
+      return `${m} phút ${s.toString().padStart(2, '0')} giây`
+    }
+  }
+  const rawDuration =
+    a.durationMins ??
+    a.duration_mins ??
+    a.time
+  if (rawDuration != null && rawDuration !== '') {
+    return `${rawDuration} phút`
+  }
+  return '-'
+})
 const totalQuestions = computed(() => (questions.value.length || attempt.value?.total_questions) ?? exam.value?.total_questions ?? '-')
 const resultScore = computed(() => attempt.value?.result ?? attempt.value?.score ?? '-')
 const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?.submittedAt ?? '-')
@@ -99,7 +122,7 @@ const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?
         <h2 class="text-2xl font-bold text-indigo-700 mb-2">{{ examTitle }}</h2>
         <div class="mb-4 text-gray-700">
           <b>Thời gian đề:</b> {{ examDuration }} phút<br />
-          <b>Thời gian làm bài:</b> {{ attemptTime }} phút<br />
+          <b>Thời gian làm bài:</b> {{ attemptDurationText }}<br />
           <b>Số câu hỏi:</b> {{ totalQuestions }}<br />
           <b>Điểm:</b> {{ resultScore }}<br />
           <b>Ngày nộp:</b> {{ submittedAt }}

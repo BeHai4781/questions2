@@ -14,15 +14,20 @@ const studentApi = useStudentApi()
 const exam = ref(null)
 const questions = ref([])
 const answers = ref({})
-const timeLeft = ref(0)
+const timeLeft = ref(0) // đếm ngược cho đề có giới hạn thời gian
+const startedAt = ref(null)
+const elapsed = ref(0) // đếm xuôi cho đề ôn tập (duration = null)
 const finished = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const error = ref(null)
 
+const isTimed = computed(() => Number(exam.value?.duration ?? 0) > 0)
+
 const timerDisplay = computed(() => {
-  const m = Math.floor(timeLeft.value / 60)
-  const s = timeLeft.value % 60
+  const seconds = isTimed.value ? timeLeft.value : elapsed.value
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
   return `${m}:${s < 10 ? '0' : ''}${s}`
 })
 
@@ -37,13 +42,27 @@ function normalizeQuestions(examData) {
 }
 
 function startTimer() {
-  const duration = exam.value?.duration ?? 0
-  timeLeft.value = duration * 60
+  const duration = Number(exam.value?.duration ?? 0)
+  timeLeft.value = duration > 0 ? duration * 60 : 0
+  elapsed.value = 0
+  if (!startedAt.value) {
+    startedAt.value = new Date().toISOString()
+  }
   const interval = setInterval(() => {
-    if (timeLeft.value > 0 && !finished.value) timeLeft.value--
-    else if (timeLeft.value <= 0 && !finished.value) {
-      finished.value = true
+    if (finished.value) {
       clearInterval(interval)
+      return
+    }
+    if (isTimed.value) {
+      if (timeLeft.value > 0) timeLeft.value--
+      else {
+        // Đề có giới hạn thời gian: hết giờ thì khóa bài
+        finished.value = true
+        clearInterval(interval)
+      }
+    } else {
+      // Đề ôn tập: không khóa, chỉ đếm xuôi từ 00:00
+      elapsed.value++
     }
   }, 1000)
 }
@@ -101,6 +120,27 @@ async function handleSubmit() {
   finished.value = true
   submitting.value = true
   const score = calculateScore()
+  // Tính thời gian làm bài thực tế
+  const totalDuration = Number(exam.value?.duration ?? 0)
+  const nowMs = Date.now()
+  let usedSeconds = 0
+  if (totalDuration > 0) {
+    // Đề có giới hạn thời gian: dùng thời gian còn lại
+    usedSeconds = totalDuration * 60 - timeLeft.value
+  } else if (startedAt.value) {
+    // Đề ôn tập: tính từ lúc bắt đầu tới lúc nộp
+    const startMs = Date.parse(startedAt.value)
+    if (!Number.isNaN(startMs)) {
+      usedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000))
+    }
+  } else {
+    usedSeconds = elapsed.value
+  }
+  const usedMinutes = Math.max(0, Math.round(usedSeconds / 60))
+  if (!startedAt.value) {
+    startedAt.value = new Date(nowMs - usedSeconds * 1000).toISOString()
+  }
+  const submittedIso = new Date(nowMs).toISOString()
   const answersPayload = answers.value
   try {
     const res = await studentApi.createAttempt({
@@ -109,7 +149,9 @@ async function handleSubmit() {
       answers: answersPayload,
       score,
       result: score,
-      totalQuestions: questions.value.length,
+      durationMins: usedMinutes,
+      submittedAt: submittedIso,
+      startTime: startedAt.value,
     })
     if (res.ok && res.data?.attempt?.id) {
       toast.success('Bạn đã hoàn thành bài thi!')
