@@ -23,11 +23,12 @@ final class ExamModel
     /** SQL dùng khi list/get exam: JOIN classes, types và đếm số câu (schema questions3) */
     private function getListSelectSql(): string
     {
-        return 'SELECT e.*, c.name AS class_name, t.name AS type_name, '
+        return 'SELECT e.*, c.name AS class_name, t.name AS type_name, u.fullname AS created_by_name, '
             . '(SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id) AS total_questions '
             . 'FROM exams e '
             . 'LEFT JOIN classes c ON e.class_id = c.id '
-            . 'LEFT JOIN types t ON e.type_id = t.id ';
+            . 'LEFT JOIN types t ON e.type_id = t.id '
+            . 'JOIN users u ON e.created_by = u.id ';
     }
 
     public function findById(string $id): ?array

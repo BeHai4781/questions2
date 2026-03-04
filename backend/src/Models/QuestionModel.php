@@ -110,7 +110,10 @@ final class QuestionModel
             $orderBy = 'created_at DESC';
         }
 
-        $sql = 'SELECT * FROM questions '
+        $sql = 'SELECT q.*, c.name AS class_name, l.name AS level_name FROM questions q'
+            . ' JOIN question_bank qb ON q.exam_id = qb.id'
+            . ' LEFT JOIN classes c ON qb.class_id = c.id'
+            . ' LEFT JOIN levels l ON qb.level_id = l.id '
             . ($whereSql ? "WHERE {$whereSql} " : '')
             . "ORDER BY {$orderBy} OFFSET :skip LIMIT :limit";
 

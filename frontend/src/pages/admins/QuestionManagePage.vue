@@ -13,15 +13,15 @@
       >
         <div class="flex gap-2 w-full md:w-auto">
           <input
-            v-model="searchSubject"
-            type="text"
-            placeholder="Tìm theo môn học"
-            class="form-input border rounded px-3 py-2 w-full md:w-48"
-          />
-          <input
             v-model="searchClass"
             type="text"
             placeholder="Tìm theo lớp"
+            class="form-input border rounded px-3 py-2 w-full md:w-48"
+          />
+          <input
+            v-model="searchLevel"
+            type="text"
+            placeholder="Tìm theo mức độ"
             class="form-input border rounded px-3 py-2 w-full md:w-48"
           />
           <button
@@ -42,8 +42,8 @@
           <thead class="bg-gray-100">
             <tr>
               <th class="px-1 py-2 border">ID</th>
-              <th class="px-3 py-2 border">Môn học</th>
               <th class="px-3 py-2 border">Lớp</th>
+              <th class="px-3 py-2 border">Mức độ</th>
               <th class="px-3 py-2 border">Nội dung</th>
               <th class="px-3 py-2 border">Thao tác</th>
             </tr>
@@ -51,8 +51,8 @@
           <tbody>
             <tr v-for="q in paginatedQuestions" :key="q.id" class="hover:bg-indigo-50">
               <td class="px-3 py-2 border font-bold text-center">{{ q.id }}</td>
-              <td class="px-3 py-2 border">{{ q.subject_name }}</td>
               <td class="px-3 py-2 border">{{ q.class_name }}</td>
+              <td class="px-3 py-2 border">{{ q.level_name }}</td>
               <td class="px-3 py-2 border">
                 {{ q.question.length > 100 ? q.question.slice(0, 100) + '...' : q.question }}
               </td>
@@ -119,7 +119,7 @@ import { toast } from 'vue3-toastify'
 // Dữ liệu mẫu
 const questions = ref([])
 const { getQuestions, deleteQuestion } = useAdminApi()
-const searchSubject = ref('')
+const searchLevel = ref('')
 const searchClass = ref('')
 const deletingId = ref(null)
 const showDeleteModal = ref(false)
@@ -146,8 +146,8 @@ onMounted(() => {
 const filteredQuestions = computed(() => {
   return questions.value.filter(
     (q) =>
-      (!searchSubject.value ||
-        q.subject_name.toLowerCase().includes(searchSubject.value.toLowerCase())) &&
+      (!searchLevel.value ||
+        q.level_name.toLowerCase().includes(searchLevel.value.toLowerCase())) &&
       (!searchClass.value || q.class_name.toLowerCase().includes(searchClass.value.toLowerCase())),
   )
 })

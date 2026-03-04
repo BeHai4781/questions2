@@ -33,7 +33,7 @@
         </div>
       </form>
 
-      <div class="mb-3 text-left">
+      <div class="mb-3 text-center">
         <strong>Tổng số đề thi:</strong> {{ filteredExams.length }}
       </div>
 
@@ -54,7 +54,7 @@
             <tr v-for="exam in paginatedExams" :key="exam.id" class="hover:bg-indigo-50">
               <td class="px-3 py-2 border font-bold text-center">{{ exam.id }}</td>
               <td class="px-3 py-2 border">{{ exam.title }}</td>
-              <td class="px-3 py-2 border">{{ exam.creator }}</td>
+              <td class="px-3 py-2 border">{{ exam.created_by_name }}</td>
               <td class="px-3 py-2 border">{{ exam.created_at }}</td>
               <td class="px-3 py-2 border">{{ exam.duration }} phút</td>
               <td class="px-3 py-2 border">{{ exam.total_questions }}</td>
