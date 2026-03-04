@@ -56,6 +56,12 @@ final class ExamController
         }
         $model2 = new QuestionModel();
         $questions = $model2->find(['examId' => $id], 0, 100);
+        $questionIds = array_column($questions, 'id');
+        $answersMap = $model2->getAnswersForQuestionIds($questionIds);
+        foreach ($questions as &$q) {
+            $q['answers'] = $answersMap[$q['id']] ?? [];
+        }
+        unset($q);
         Response::success(['exam' => $exam, 'questions' => $questions], 'Exam retrieved successfully');
     }
 

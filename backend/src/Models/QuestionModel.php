@@ -40,11 +40,49 @@ final class QuestionModel
         return (int)$st->fetchColumn();
     }
 
+    /**
+     * Lấy danh sách đáp án theo các question_id (schema questions3: bảng answers).
+     * @return array<string, array<int, array{id: string, content: string, order_index: int|null}>>
+     */
+    public function getAnswersForQuestionIds(array $questionIds): array
+    {
+        if ($questionIds === []) {
+            return [];
+        }
+        $ids = array_map('intval', array_filter($questionIds, 'ctype_digit'));
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "SELECT id, question_id, content, order_index FROM answers WHERE question_id IN ({$placeholders}) ORDER BY question_id, order_index ASC NULLS LAST";
+        $st = $this->pdo->prepare($sql);
+        $st->execute(array_values($ids));
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $qid = (string)$row['question_id'];
+            if (!isset($out[$qid])) {
+                $out[$qid] = [];
+            }
+            $out[$qid][] = [
+                'id' => (string)$row['id'],
+                'content' => (string)($row['content'] ?? ''),
+                'order_index' => isset($row['order_index']) ? (int)$row['order_index'] : null,
+            ];
+        }
+        return $out;
+    }
+
     /** @return array<int,array<string,mixed>> */
     public function find(array $filter, int $skip, int $limit): array
     {
         [$whereSql, $params] = $this->buildListWhere($filter);
-        $orderBy = $this->hasColumn('created_at') ? 'created_at DESC' : 'id DESC';
+        $orderBy = 'id DESC';
+        if (isset($filter['examId']) && $this->hasColumn('order_index')) {
+            $orderBy = 'order_index ASC NULLS LAST';
+        } elseif ($this->hasColumn('created_at')) {
+            $orderBy = 'created_at DESC';
+        }
 
         $sql = 'SELECT * FROM questions '
             . ($whereSql ? "WHERE {$whereSql} " : '')
@@ -182,6 +220,9 @@ final class QuestionModel
             if (str_ends_with((string)$k, '_id') && $v !== null) {
                 $row[$k] = (string)$v;
             }
+        }
+        if (array_key_exists('content', $row) && !array_key_exists('question', $row)) {
+            $row['question'] = $row['content'];
         }
         return $row;
     }

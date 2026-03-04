@@ -63,15 +63,11 @@ async function loadExam() {
     loading.value = false
     return
   }
-  console.log('Loaded exam:', res)
   exam.value = examData
   questions.value = res.data?.questions ?? normalizeQuestions(examData)
   const init = {}
   questions.value.forEach((q) => {
     init[q.id] = null
-  })
-  questions.value.map((q) => {
-    
   })
   answers.value = { ...init }
   startTimer()
@@ -93,8 +89,8 @@ function calculateScore() {
   let correct = 0
   questions.value.forEach((q) => {
     const userChoice = answers.value[q.id]
-    const correctIdx = q.correctAnswer ?? q.correct_answer
-    if (userChoice !== null && userChoice !== undefined && Number(userChoice) === Number(correctIdx)) correct++
+    const correctId = q.correctAnswerId ?? q.correct_answer ?? q.correctAnswer
+    if (userChoice != null && userChoice !== '' && String(userChoice) === String(correctId)) correct++
   })
   const total = questions.value.length
   return total ? Math.round((correct / total) * 100) : 0
@@ -113,6 +109,7 @@ async function handleSubmit() {
       answers: answersPayload,
       score,
       result: score,
+      totalQuestions: questions.value.length,
     })
     if (res.ok && res.data?.attempt?.id) {
       toast.success('Bạn đã hoàn thành bài thi!')
@@ -138,7 +135,15 @@ function handleCancel() {
 }
 
 function answerOptions(q) {
-  // Nếu có các trường answer_a, answer_b, answer_c, answer_d thì trả về theo thứ tự
+  // Schema questions3: mảng answers từ API [{ id, content, order_index }, ...]
+  const ans = q.answers || q.options
+  if (Array.isArray(ans) && ans.length) {
+    return ans.map((a) => ({
+      key: a.id ?? a.key,
+      text: typeof a === 'string' ? a : (a?.text ?? a?.content ?? ''),
+    }))
+  }
+  // Fallback: answer_a, answer_b, answer_c, answer_d
   if (
     q.hasOwnProperty('answer_a') ||
     q.hasOwnProperty('answer_b') ||
@@ -152,9 +157,6 @@ function answerOptions(q) {
       { key: 3, text: q.answer_d ?? '' },
     ]
   }
-  // Nếu có dạng mảng answers/options thì giữ nguyên logic cũ
-  const ans = q.answers || q.options
-  if (Array.isArray(ans)) return ans.map((a, i) => ({ key: i, text: typeof a === 'string' ? a : a?.text ?? a?.content ?? '' }))
   return []
 }
 </script>
@@ -178,11 +180,11 @@ function answerOptions(q) {
           class="question-box mb-6 p-4 border border-gray-200 rounded-lg"
         >
           <b>Câu {{ idx + 1 }}:</b> {{ q.question || q.content }}
-          <div class="mt-2 grid grid-cols-1 md:grid-cols-1 gap-2">
+          <div v-if="answerOptions(q).length" class="mt-2 grid grid-cols-1 md:grid-cols-1 gap-2">
             <label
-              v-for="ans in answerOptions(q)"
-              :key="ans.key"
-              class="answer flex items-center gap-2 cursor-pointer"
+              v-for="(ans, aIdx) in answerOptions(q)"
+              :key="ans.key + '_' + aIdx"
+              class="answer flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-indigo-50 border border-transparent hover:border-indigo-200"
             >
               <input
                 type="radio"
@@ -192,9 +194,10 @@ function answerOptions(q) {
                 :value="ans.key"
                 :disabled="finished"
               />
-              <span>{{ ans.text }}</span>
+              <span class="select-none">{{ ans.text }}</span>
             </label>
           </div>
+          <p v-else class="mt-2 text-gray-500 text-sm">Chưa có đáp án.</p>
         </div>
         <div class="flex gap-4 mt-8">
           <button

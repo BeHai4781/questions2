@@ -20,11 +20,22 @@ final class ExamModel
         $this->pdo = Database::pdo();
     }
 
+    /** SQL dùng khi list/get exam: JOIN classes, types và đếm số câu (schema questions3) */
+    private function getListSelectSql(): string
+    {
+        return 'SELECT e.*, c.name AS class_name, t.name AS type_name, '
+            . '(SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id) AS total_questions '
+            . 'FROM exams e '
+            . 'LEFT JOIN classes c ON e.class_id = c.id '
+            . 'LEFT JOIN types t ON e.type_id = t.id ';
+    }
+
     public function findById(string $id): ?array
     {
         if (!ctype_digit($id)) return null;
 
-        $st = $this->pdo->prepare('SELECT * FROM exams WHERE id = :id LIMIT 1');
+        $sql = $this->getListSelectSql() . 'WHERE e.id = :id LIMIT 1';
+        $st = $this->pdo->prepare($sql);
         $st->execute([':id' => (int)$id]);
         $row = $st->fetch();
         if (!$row) return null;
@@ -34,8 +45,11 @@ final class ExamModel
 
     public function countDocuments(array $filter): int
     {
-        [$whereSql, $params] = $this->buildListWhere($filter);
-        $sql = 'SELECT COUNT(*) FROM exams ' . ($whereSql ? "WHERE {$whereSql}" : '');
+        [$whereSql, $params] = $this->buildListWhere($filter, 'e');
+        $sql = 'SELECT COUNT(*) FROM exams e '
+            . 'LEFT JOIN classes c ON e.class_id = c.id '
+            . 'LEFT JOIN types t ON e.type_id = t.id '
+            . ($whereSql ? "WHERE {$whereSql}" : '');
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
         return (int)$st->fetchColumn();
@@ -44,10 +58,10 @@ final class ExamModel
     /** @return array<int,array<string,mixed>> */
     public function find(array $filter, int $skip, int $limit): array
     {
-        [$whereSql, $params] = $this->buildListWhere($filter);
-        $orderBy = $this->hasColumn('created_at') ? 'created_at DESC' : 'id DESC';
+        [$whereSql, $params] = $this->buildListWhere($filter, 'e');
+        $orderBy = $this->hasColumn('created_at') ? 'e.created_at DESC' : 'e.id DESC';
 
-        $sql = 'SELECT * FROM exams '
+        $sql = $this->getListSelectSql()
             . ($whereSql ? "WHERE {$whereSql} " : '')
             . "ORDER BY {$orderBy} OFFSET :skip LIMIT :limit";
 
@@ -72,6 +86,8 @@ final class ExamModel
     {
         $map = [
             'createdBy' => 'created_by',
+            'classId' => 'class_id',
+            'typeId' => 'type_id',
             'totalQuestions' => 'total_questions',
             'duration' => 'duration',
             'nb' => 'nb',
@@ -112,6 +128,8 @@ final class ExamModel
 
         $map = [
             'createdBy' => 'created_by',
+            'classId' => 'class_id',
+            'typeId' => 'type_id',
             'totalQuestions' => 'total_questions',
             'duration' => 'duration',
             'nb' => 'nb',
@@ -166,6 +184,17 @@ final class ExamModel
             if (str_ends_with((string)$k, '_id') && $v !== null) {
                 $row[$k] = (string)$v;
             }
+        }
+        // Schema questions3: map tên lớp/loại và số câu cho frontend
+        if (array_key_exists('class_name', $row)) {
+            $row['class'] = $row['className'] = $row['class_name'];
+        }
+        if (array_key_exists('type_name', $row)) {
+            $row['type'] = $row['typeName'] = $row['type_name'];
+        }
+        if (array_key_exists('total_questions', $row)) {
+            $row['total_questions'] = (int)$row['total_questions'];
+            $row['totalQuestions'] = $row['total_questions'];
         }
         return $row;
     }
@@ -223,11 +252,12 @@ final class ExamModel
     }
 
     /** @return array{0:string,1:array<string,mixed>} */
-    private function buildListWhere(array $filter): array
+    private function buildListWhere(array $filter, string $tableAlias = ''): array
     {
         $this->loadColumns();
         $where = [];
         $params = [];
+        $pre = $tableAlias !== '' ? $tableAlias . '.' : '';
 
         if (isset($filter['search']) && is_string($filter['search']) && trim($filter['search']) !== '') {
             $q = trim($filter['search']);
@@ -239,7 +269,7 @@ final class ExamModel
                 $parts = [];
                 foreach ($searchCols as $i => $col) {
                     $ph = ':q' . $i;
-                    $parts[] = "{$col} ILIKE {$ph}";
+                    $parts[] = "{$pre}{$col} ILIKE {$ph}";
                     $params[$ph] = '%' . $q . '%';
                 }
                 $where[] = '(' . implode(' OR ', $parts) . ')';
@@ -255,8 +285,18 @@ final class ExamModel
             if ($val === null || $val === '') continue;
             if (!$this->hasColumn($col)) continue;
             $ph = ':' . $col;
-            $where[] = "{$col} = {$ph}";
+            $where[] = "{$pre}{$col} = {$ph}";
             $params[$ph] = $val;
+        }
+
+        // Lọc theo tên lớp / loại (schema questions3)
+        if ($tableAlias !== '' && isset($filter['class']) && is_string($filter['class']) && trim($filter['class']) !== '') {
+            $where[] = 'c.name = :filter_class';
+            $params[':filter_class'] = trim($filter['class']);
+        }
+        if ($tableAlias !== '' && isset($filter['type']) && is_string($filter['type']) && trim($filter['type']) !== '') {
+            $where[] = 't.name = :filter_type';
+            $params[':filter_type'] = trim($filter['type']);
         }
 
         return [implode(' AND ', $where), $params];

@@ -9,6 +9,8 @@ use PDO;
 
 final class ExamAttemptModel
 {
+    private const TABLE = 'exam_results';
+
     private PDO $pdo;
     /** @var array<int,string>|null */
     private ?array $columns = null;
@@ -24,7 +26,7 @@ final class ExamAttemptModel
     {
         if (!ctype_digit($id)) return null;
 
-        $st = $this->pdo->prepare('SELECT * FROM user_exams WHERE id = :id LIMIT 1');
+        $st = $this->pdo->prepare('SELECT * FROM ' . self::TABLE . ' WHERE id = :id LIMIT 1');
         $st->execute([':id' => (int)$id]);
         $row = $st->fetch();
         if (!$row) return null;
@@ -35,7 +37,7 @@ final class ExamAttemptModel
     public function countDocuments(array $filter): int
     {
         [$whereSql, $params] = $this->buildListWhere($filter);
-        $sql = 'SELECT COUNT(*) FROM user_exams ' . ($whereSql ? "WHERE {$whereSql}" : '');
+        $sql = 'SELECT COUNT(*) FROM ' . self::TABLE . ' ' . ($whereSql ? "WHERE {$whereSql}" : '');
         $st = $this->pdo->prepare($sql);
         $st->execute($params);
         return (int)$st->fetchColumn();
@@ -45,9 +47,9 @@ final class ExamAttemptModel
     public function find(array $filter, int $skip, int $limit): array
     {
         [$whereSql, $params] = $this->buildListWhere($filter);
-        $orderBy = $this->hasColumn('submitted_at') ? 'submitted_at DESC' : 'id DESC';
+        $orderBy = $this->hasColumn('submit_time') ? 'submit_time DESC' : 'id DESC';
 
-        $sql = 'SELECT * FROM user_exams '
+        $sql = 'SELECT * FROM ' . self::TABLE . ' '
             . ($whereSql ? "WHERE {$whereSql} " : '')
             . "ORDER BY {$orderBy} OFFSET :skip LIMIT :limit";
 
@@ -72,21 +74,31 @@ final class ExamAttemptModel
     {
         $map = [
             'examId' => 'exam_id',
-            'userId' => 'user_id',
-            'result' => 'result',
-            'time' => 'time',
-            'submittedAt' => 'submitted_at',
+            'userId' => 'student_id',
+            'result' => 'total_score',
+            'score' => 'total_score',
+            'totalScore' => 'total_score',
+            'totalQuestions' => 'total_questions',
+            'correctCount' => 'correct_count',
+            'durationMins' => 'duration_mins',
         ];
 
         $payload = $this->filterData($data, $map);
 
-        if (!$payload) {
+        if (!isset($payload['exam_id']) || !isset($payload['student_id'])) {
             return [];
+        }
+
+        if ($this->hasColumn('submit_time') && !isset($payload['submit_time'])) {
+            $payload['submit_time'] = date('Y-m-d H:i:s');
+        }
+        if ($this->hasColumn('total_score') && !isset($payload['total_score'])) {
+            $payload['total_score'] = (float)($data['score'] ?? $data['result'] ?? 0);
         }
 
         $cols = array_keys($payload);
         $placeholders = array_map(fn($c) => ':' . $c, $cols);
-        $sql = 'INSERT INTO user_exams (' . implode(', ', $cols) . ')
+        $sql = 'INSERT INTO ' . self::TABLE . ' (' . implode(', ', $cols) . ')
                 VALUES (' . implode(', ', $placeholders) . ')
                 RETURNING id';
         $st = $this->pdo->prepare($sql);
@@ -106,10 +118,14 @@ final class ExamAttemptModel
 
         $map = [
             'examId' => 'exam_id',
-            'userId' => 'user_id',
-            'result' => 'result',
-            'time' => 'time',
-            'submittedAt' => 'submitted_at',
+            'userId' => 'student_id',
+            'result' => 'total_score',
+            'score' => 'total_score',
+            'totalScore' => 'total_score',
+            'totalQuestions' => 'total_questions',
+            'correctCount' => 'correct_count',
+            'durationMins' => 'duration_mins',
+            'submitTime' => 'submit_time',
         ];
 
         $payload = $this->filterData($updates, $map);
@@ -123,7 +139,7 @@ final class ExamAttemptModel
             $set[] = "{$col} = :{$col}";
         }
 
-        $sql = 'UPDATE user_exams SET ' . implode(', ', $set) . ' WHERE id = :id';
+        $sql = 'UPDATE ' . self::TABLE . ' SET ' . implode(', ', $set) . ' WHERE id = :id';
         $st = $this->pdo->prepare($sql);
         $st->bindValue(':id', (int)$id, PDO::PARAM_INT);
         foreach ($payload as $k => $v) {
@@ -137,7 +153,7 @@ final class ExamAttemptModel
     public function deleteById(string $id): bool
     {
         if (!ctype_digit($id)) return false;
-        $st = $this->pdo->prepare('DELETE FROM user_exams WHERE id = :id');
+        $st = $this->pdo->prepare('DELETE FROM ' . self::TABLE . ' WHERE id = :id');
         $st->execute([':id' => (int)$id]);
         return $st->rowCount() > 0;
     }
@@ -147,8 +163,14 @@ final class ExamAttemptModel
     {
         $this->loadColumns();
         $row = $this->decodeJsonColumns($row);
-        if (isset($row['submitted_at']) && $row['submitted_at'] !== null) {
-            $row['submittedAt'] = is_string($row['submitted_at']) ? $row['submitted_at'] : (string)$row['submitted_at'];
+        if (isset($row['submit_time']) && $row['submit_time'] !== null) {
+            $row['submittedAt'] = is_string($row['submit_time']) ? $row['submit_time'] : (string)$row['submit_time'];
+        }
+        if (isset($row['student_id']) && $row['student_id'] !== null) {
+            $row['user_id'] = (string)$row['student_id'];
+        }
+        if (isset($row['total_score']) && $row['total_score'] !== null) {
+            $row['result'] = (float)$row['total_score'];
         }
         if (isset($row['id'])) {
             $row['id'] = (string)$row['id'];
@@ -166,7 +188,7 @@ final class ExamAttemptModel
         if ($this->columns !== null && $this->columnTypes !== null) return;
 
         $st = $this->pdo->prepare("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :t");
-        $st->execute([':t' => 'user_exams']);
+        $st->execute([':t' => self::TABLE]);
         $rows = $st->fetchAll() ?: [];
 
         $this->columns = [];
@@ -222,7 +244,7 @@ final class ExamAttemptModel
 
         $map = [
             'examId' => 'exam_id',
-            'userId' => 'user_id',
+            'userId' => 'student_id',
         ];
         foreach ($map as $filterKey => $col) {
             if (!array_key_exists($filterKey, $filter)) continue;

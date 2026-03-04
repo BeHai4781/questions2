@@ -103,7 +103,7 @@ onMounted(async () => {
             <td class="py-3 px-4 text-center">{{ exam.type || exam.subject || '-' }}</td>
             <td class="py-3 px-4 text-center">{{ exam.class || exam.className || '-' }}</td>
             <td class="py-3 px-4 text-center">{{ exam.total_questions ?? exam.totalQuestions ?? '-' }}</td>
-            <td class="py-3 px-4 text-center">{{ exam.duration ?? '-' }} phút</td>
+            <td class="py-3 px-4 text-center">{{ exam.duration != null && exam.duration !== '' ? exam.duration + ' phút' : '-' }}</td>
             <td class="py-3 px-4 text-center">
               <a
                 :href="`/student/exam?id=${exam.id}`"
