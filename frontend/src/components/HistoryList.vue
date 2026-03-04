@@ -9,16 +9,45 @@ const loading = ref(true)
 const error = ref(null)
 
 const historyList = computed(() => {
-  return attempts.value.map((a) => {
+  const items = attempts.value.map((a) => {
     const exam = examMap.value[a.exam_id ?? a.examId] || {}
+    const startRaw = a.start_time ?? a.startTime
+    const endRaw = a.submit_time ?? a.submittedAt ?? a.submitted_at
+    let durationText = '-'
+    if (startRaw && endRaw) {
+      const startMs = Date.parse(startRaw)
+      const endMs = Date.parse(endRaw)
+      if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs >= startMs) {
+        const diffSec = Math.floor((endMs - startMs) / 1000)
+        const m = Math.floor(diffSec / 60)
+        const s = diffSec % 60
+        durationText = `${m} phút ${s.toString().padStart(2, '0')} giây`
+      }
+    }
+    if (durationText === '-') {
+      const rawDuration =
+        a.durationMins ??
+        a.duration_mins ??
+        a.time
+      if (rawDuration != null && rawDuration !== '') {
+        durationText = `${rawDuration} phút`
+      }
+    }
+    const dateRaw = a.submitted_at ?? a.submittedAt ?? a.created_at ?? a.createdAt ?? null
+    const ts = dateRaw ? Date.parse(dateRaw) || 0 : 0
     return {
       id: a.id,
       title: exam.title || exam.name || `Đề #${a.exam_id ?? a.examId}`,
-      date: a.submitted_at ?? a.submittedAt ?? a.created_at ?? a.createdAt ?? '-',
+      date: dateRaw ?? '-',
       score: a.result ?? a.score ?? '-',
-      duration: a.time != null ? `${a.time} phút` : '-',
+      duration: durationText,
+      _ts: ts,
     }
   })
+  // Sắp xếp theo thời gian nộp, bản ghi không có ngày sẽ xuống cuối
+  return items
+    .sort((a, b) => (b._ts ?? 0) - (a._ts ?? 0))
+    .map(({ _ts, ...rest }) => rest)
 })
 
 onMounted(async () => {
