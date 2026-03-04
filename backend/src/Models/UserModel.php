@@ -96,7 +96,7 @@ final class UserModel
         $hash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : null;
 
         $sql = 'INSERT INTO users (fullname, username, password, email, phone, status, role, is_first_login)
-                VALUES (:fullname, :username, :password, :email, :phone, :status, :role, CAST(:is_first_login AS BOOLEAN))
+                VALUES (:fullname, :username, :password, :email, :phone, :status, :role, :is_first_login)
                 RETURNING id';
 
         $status = (string)($data['status'] ?? 'actived');
