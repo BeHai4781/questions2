@@ -175,3 +175,43 @@ export async function deleteQuestion(id, authHeaders = {}) {
     headers: authHeaders,
   })
 }
+
+// ─────────────────────────────────────────────
+// UPLOADS
+// ─────────────────────────────────────────────
+
+/**
+ * POST /api/upload-exam — parse file .docx/.xlsx thành mảng câu hỏi.
+ * Dùng FormData (không JSON), KHÔNG set Content-Type thủ công.
+ * @param {File} file - file .docx hoặc .xlsx
+ * @param {object} authHeaders - { Authorization: 'Bearer ...' }
+ * @returns {{ data: { data: Array } }} mảng câu hỏi đọc được
+ */
+export async function uploadExamFile(file, authHeaders = {}) {
+  const fd = new FormData()
+  fd.append('uploadFile', file)
+  // Không dùng request() vì request() set Content-Type: application/json
+  const res = await fetch(`${BASE}/upload-exam`, {
+    method: 'POST',
+    headers: authHeaders,   // chỉ Authorization, KHÔNG set Content-Type
+    body: fd,
+  })
+  return res.json()
+}
+
+/**
+ * POST /api/upload-image — upload ảnh câu hỏi, trả về URL.
+ * @param {File} file - file ảnh (jpg, png, webp, ...)
+ * @param {object} authHeaders
+ * @returns {{ data: { url: string } }}
+ */
+export async function uploadQuestionImage(file, authHeaders = {}) {
+  const fd = new FormData()
+  fd.append('image', file)
+  const res = await fetch(`${BASE}/upload-image`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: fd,
+  })
+  return res.json()
+}

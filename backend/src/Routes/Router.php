@@ -418,6 +418,172 @@ final class Router
             QuestionBankController::deleteQuestion($id, $user);
         });
 
+        // ── Upload routes ──────────────────────────────────────────────────────
+
+        $this->map('POST', '/api/upload-exam', function () {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+            // Delegate to upload_exam.php handler (returns JSON directly)
+            $uploadDir = __DIR__ . '/../../uploads/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+            if (!isset($_FILES['uploadFile']) || $_FILES['uploadFile']['error'] !== UPLOAD_ERR_OK) {
+                Response::error('Không có file hợp lệ', 400, 'NO_FILE');
+                return;
+            }
+            $file = $_FILES['uploadFile'];
+            $ext  = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['docx', 'xlsx'], true)) {
+                Response::error('Chỉ hỗ trợ .docx hoặc .xlsx', 400, 'INVALID_EXT');
+                return;
+            }
+            $filePath = $uploadDir . uniqid('exam_') . '.' . $ext;
+            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+                Response::error('Không thể lưu file tạm', 500, 'SAVE_FAILED');
+                return;
+            }
+
+            try {
+                require_once __DIR__ . '/../../vendor/autoload.php';
+                $questions = [];
+
+                if ($ext === 'docx') {
+                    // ── Đọc từng paragraph riêng (mỗi dòng là 1 paragraph) ──
+                    $phpWord    = \PhpOffice\PhpWord\IOFactory::load($filePath);
+                    $paragraphs = [];
+
+                    foreach ($phpWord->getSections() as $section) {
+                        foreach ($section->getElements() as $element) {
+                            /** @var object $element */
+                            // Paragraph thường
+                            if ($element instanceof \PhpOffice\PhpWord\Element\TextRun
+                                || $element instanceof \PhpOffice\PhpWord\Element\Text) {
+                                $t = trim($element->getText());
+                                if ($t !== '') $paragraphs[] = $t;
+                            } elseif (method_exists($element, 'getElements')) {
+                                // TextRun chứa nhiều Run con
+                                $line = '';
+                                foreach ($element->getElements() as $child) {
+                                    /** @var object $child */
+                                    if (method_exists($child, 'getText')) {
+                                        $line .= $child->getText();
+                                    }
+                                }
+                                $t = trim($line);
+                                if ($t !== '') $paragraphs[] = $t;
+                            } elseif (method_exists($element, 'getText')) {
+                                $t = trim($element->getText());
+                                if ($t !== '') $paragraphs[] = $t;
+                            }
+                        }
+                    }
+
+                    // ── Parser tuần tự theo từng paragraph ──
+                    $i = 0;
+                    $n = count($paragraphs);
+                    while ($i < $n) {
+                        $line = $paragraphs[$i];
+
+                        // Nhận diện dòng câu hỏi: "Câu N:" hoặc "Câu N."
+                        if (preg_match('/^Câu\s*\d+\s*[:.]\s*(.+)/iu', $line, $qm)) {
+                            $content = trim($qm[1]);
+                            $answers = [];
+                            $correct = null;
+                            $i++;
+
+                            while ($i < $n) {
+                                $l = $paragraphs[$i];
+
+                                // Đáp án A. / B. / C. / D.
+                                if (preg_match('/^([A-D])\.\s*(.*)/u', $l, $am)) {
+                                    $answers[] = trim($am[2]);
+                                    $i++;
+                                }
+                                // Dòng đáp án đúng
+                                elseif (preg_match('/^Đáp án\s*[:.]\s*([A-D])/iu', $l, $dm)) {
+                                    $correct = strtoupper($dm[1]);
+                                    $i++;
+                                    break;
+                                }
+                                // Dòng tiêu đề phần (PHẦN A, PHẦN B...) → bỏ qua
+                                elseif (preg_match('/^(PHẦN|ĐỀ)\s/iu', $l)) {
+                                    $i++;
+                                }
+                                // Câu hỏi mới → dừng, không tăng i
+                                elseif (preg_match('/^Câu\s*\d+\s*[:.]/iu', $l)) {
+                                    break;
+                                }
+                                else {
+                                    $i++;
+                                }
+                            }
+
+                            if ($content && count($answers) >= 2 && $correct) {
+                                $questions[] = [
+                                    'question' => $content,
+                                    'answers'  => $answers,
+                                    'correct'  => $correct,
+                                ];
+                            }
+                        } else {
+                            $i++;
+                        }
+                    }
+
+                } elseif ($ext === 'xlsx') {
+                    $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+                    $sheet = $spreadsheet->getActiveSheet();
+                    $rows  = $sheet->toArray(null, true, true, true);
+                    foreach ($rows as $index => $row) {
+                        if ($index == 1) continue; // bỏ hàng tiêu đề
+                        $question = trim($row['A'] ?? '');
+                        $correct  = strtoupper(trim($row['B'] ?? ''));
+                        $answers  = [];
+                        for ($col = 'C'; $col <= 'Z'; $col++) {
+                            $val = trim($row[$col] ?? '');
+                            if ($val !== '') $answers[] = $val;
+                        }
+                        if ($question && count($answers) > 0) {
+                            $questions[] = ['question' => $question, 'answers' => $answers, 'correct' => $correct];
+                        }
+                    }
+                }
+
+                @unlink($filePath);
+                Response::success(['status' => 'success', 'data' => $questions], 'File parsed successfully');
+            } catch (\Exception $e) {
+                @unlink($filePath);
+                Response::error($e->getMessage(), 500, 'PARSE_ERROR');
+            }
+        });
+
+        $this->map('POST', '/api/upload-image', function () {
+            $user = Auth::authenticate();
+            Auth::authorize($user, 'admin', 'teacher');
+
+            $uploadDir = __DIR__ . '/../../uploads/questions/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+            if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+                Response::error('Không có file ảnh', 400, 'NO_IMAGE');
+                return;
+            }
+            $file    = $_FILES['image'];
+            $ext     = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            if (!in_array($ext, $allowed, true)) {
+                Response::error('Định dạng ảnh không hợp lệ', 400, 'INVALID_IMAGE_EXT');
+                return;
+            }
+            $filename = uniqid('q_') . '.' . $ext;
+            $path     = $uploadDir . $filename;
+            if (move_uploaded_file($file['tmp_name'], $path)) {
+                Response::success(['status' => 'success', 'url' => '/uploads/questions/' . $filename], 'Image uploaded');
+            } else {
+                Response::error('Lỗi khi lưu ảnh', 500, 'IMAGE_SAVE_FAILED');
+            }
+        });
+
         $this->map('GET', '/api/exam-attempts', function () {
             $authDisabled = (($_ENV['AUTH_DISABLED'] ?? getenv('AUTH_DISABLED') ?: 'false') === 'true');
             $user = $authDisabled ? [] : Auth::authenticate();
