@@ -72,8 +72,12 @@ export async function deleteExam(id, authHeaders = {}) {
   })
 }
 
+// ─────────────────────────────────────────────
+// QUESTION BANK (ngân hàng câu hỏi)
+// ─────────────────────────────────────────────
+
 /**
- * GET /api/question-bank — danh sách câu hỏi trong ngân hàng 
+ * GET /api/question-bank — danh sách câu hỏi trong ngân hàng (teacher tự tạo).
  * @param {object} params - { page, limit, search, classId, difficulty }
  */
 export async function getBankQuestions(params = {}, authHeaders = {}) {
@@ -133,6 +137,9 @@ export async function deleteBankQuestion(id, authHeaders = {}) {
   })
 }
 
+// ─────────────────────────────────────────────
+// QUESTIONS (câu hỏi thuộc đề thi cụ thể)
+// ─────────────────────────────────────────────
 
 /**
  * GET /api/questions?examId=:examId — câu hỏi của một đề thi.
@@ -214,4 +221,24 @@ export async function uploadQuestionImage(file, authHeaders = {}) {
     body: fd,
   })
   return res.json()
+}
+
+// ─────────────────────────────────────────────
+// EXAM ATTEMPTS (teacher xem lịch sử làm bài)
+// ─────────────────────────────────────────────
+
+/**
+ * GET /api/exam-attempts?examId=:id — lịch sử làm bài của tất cả student cho 1 đề.
+ * @param {object} params - { examId, page, limit }
+ */
+export async function getExamAttempts(params = {}, authHeaders = {}) {
+  const q = new URLSearchParams()
+  if (params.examId != null) q.set('examId', String(params.examId))
+  if (params.page   != null) q.set('page',   String(params.page))
+  if (params.limit  != null) q.set('limit',  String(params.limit))
+  const query = q.toString()
+  return request(`${BASE}/exam-attempts${query ? `?${query}` : ''}`, {
+    method: 'GET',
+    headers: authHeaders,
+  })
 }

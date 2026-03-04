@@ -48,21 +48,21 @@ final class ExamController
 
     public static function getExamById(string $id, array $currentUser): void
     {
-        $model = new ExamModel();
-        $exam = $model->findById($id);
+        $examModel = new ExamModel();
+        $exam = $examModel->findById($id);
         if (!$exam) {
             Response::error('Exam not found', 404, 'EXAM_NOT_FOUND');
             return;
         }
-        $model2 = new QuestionModel();
-        $questions = $model2->find(['examId' => $id], 0, 100);
-        $questionIds = array_column($questions, 'id');
-        $answersMap = $model2->getAnswersForQuestionIds($questionIds);
-        foreach ($questions as &$q) {
-            $q['answers'] = $answersMap[$q['id']] ?? [];
-        }
-        unset($q);
-        Response::success(['exam' => $exam, 'questions' => $questions], 'Exam retrieved successfully');
+
+        // QuestionModel.toJson() đã tự embed answers (kể cả is_correct) qua findAnswers()
+        $questionModel = new QuestionModel();
+        $questions = $questionModel->find(['examId' => $id], 0, 200);
+
+        Response::success(
+            ['exam' => $exam, 'questions' => $questions],
+            'Exam retrieved successfully'
+        );
     }
 
     public static function createExam(array $body, array $currentUser): void

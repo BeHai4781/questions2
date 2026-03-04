@@ -73,6 +73,32 @@ final class QuestionModel
         return $out;
     }
 
+    /**
+     * Load đáp án của 1 câu hỏi, bao gồm is_correct.
+     * Dùng nội bộ trong toJson() để embed answers vào mọi response.
+     *
+     * @return array<int, array{id:string, content:string, is_correct:bool, order_index:int}>
+     */
+    private function findAnswers(int $questionId): array
+    {
+        $st = $this->pdo->prepare(
+            'SELECT id, content, is_correct, order_index
+               FROM answers
+              WHERE question_id = :qid
+              ORDER BY order_index ASC NULLS LAST, id ASC'
+        );
+        $st->execute([':qid' => $questionId]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function (array $a): array {
+            return [
+                'id'          => (string)$a['id'],
+                'content'     => (string)($a['content'] ?? ''),
+                'is_correct'  => (bool)$a['is_correct'],
+                'order_index' => (int)($a['order_index'] ?? 0),
+            ];
+        }, $rows);
+    }
+
     /** @return array<int,array<string,mixed>> */
     public function find(array $filter, int $skip, int $limit): array
     {
@@ -223,6 +249,10 @@ final class QuestionModel
         }
         if (array_key_exists('content', $row) && !array_key_exists('question', $row)) {
             $row['question'] = $row['content'];
+        }
+        // Embed answers để frontend không cần gọi thêm API
+        if (isset($row['id']) && !array_key_exists('answers', $row)) {
+            $row['answers'] = $this->findAnswers((int)$row['id']);
         }
         return $row;
     }

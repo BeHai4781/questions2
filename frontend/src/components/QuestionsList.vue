@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTeacherApi } from '@/composables/useTeacherApi.js'
 import CreateQuestions from './CreateQuestions.vue'
+import QuestionDetail  from './QuestionDetail.vue'
 
 const api = useTeacherApi()
 
@@ -13,6 +14,22 @@ const filterClass = ref('')
 const deletingId  = ref(null)
 const showCreate  = ref(false)
 
+const editingQuestion = ref(null)  
+
+function openEdit(question) {
+  editingQuestion.value = question
+}
+function closeEdit() {
+  editingQuestion.value = null
+}
+function handleUpdated(updatedQuestion) {
+  // Cập nhật lại câu hỏi trong danh sách mà không cần reload toàn bộ
+  const idx = questions.value.findIndex(q => String(q.id) === String(updatedQuestion.id))
+  if (idx !== -1) questions.value[idx] = updatedQuestion
+  closeEdit()
+}
+
+//Pagination
 const currentPage  = ref(1)
 const totalPages   = ref(1)
 const totalItems   = ref(0)
@@ -39,9 +56,9 @@ async function fetchQuestions(page = 1) {
     })
 
     const items = res?.data?.items ?? res?.data ?? []
-    questions.value  = items
-    totalPages.value = res?.data?.pagination?.totalPages ?? res?.pagination?.totalPages ?? 1
-    totalItems.value = res?.data?.pagination?.total     ?? res?.pagination?.total       ?? items.length
+    questions.value   = items
+    totalPages.value  = res?.data?.pagination?.totalPages ?? res?.pagination?.totalPages ?? 1
+    totalItems.value  = res?.data?.pagination?.total      ?? res?.pagination?.total      ?? items.length
     currentPage.value = page
   } catch (e) {
     error.value = 'Không thể tải danh sách câu hỏi.'
@@ -81,9 +98,9 @@ async function handleDelete(question) {
   deletingId.value = question.id
   try {
     await api.deleteBankQuestion(question.id)
-    questions.value = questions.value.filter(q => q.id !== question.id)
+    questions.value  = questions.value.filter(q => q.id !== question.id)
     totalItems.value = Math.max(0, totalItems.value - 1)
-  } catch (e) {
+  } catch {
     alert('Xóa thất bại, vui lòng thử lại.')
   } finally {
     deletingId.value = null
@@ -176,7 +193,8 @@ function handleQuestionCreated() {
 
           <!-- Actions -->
           <div class="flex gap-1 flex-shrink-0 pt-1">
-            <button @click="$router.push(`/teacher/questions/${question.id}/edit`)"
+            <!-- Nút Chỉnh sửa  -->
+            <button @click="openEdit(question)"
               class="text-indigo-600 hover:text-indigo-700 p-2 rounded hover:bg-indigo-50 transition" title="Chỉnh sửa">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -214,6 +232,16 @@ function handleQuestionCreated() {
       </div>
     </div>
 
-    <CreateQuestions v-if="showCreate" @close="showCreate = false" @created="handleQuestionCreated" />
+    <!-- Modal tạo câu hỏi mới -->
+    <CreateQuestions v-if="showCreate"
+      @close="showCreate = false"
+      @created="handleQuestionCreated" />
+
+    <!-- Modal chỉnh sửa câu hỏi -->
+    <QuestionDetail v-if="editingQuestion"
+      :question="editingQuestion"
+      @close="closeEdit"
+      @updated="handleUpdated" />
+
   </div>
 </template>

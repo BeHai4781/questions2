@@ -148,7 +148,8 @@ function handleExamCreated(newExam) {
             <h3 class="text-xl font-bold text-gray-800 mb-4">{{ className }}</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div v-for="exam in exams" :key="exam.id"
-                class="bg-white rounded-lg shadow-md hover:shadow-lg transition p-6 border-l-4 border-indigo-600">
+                class="bg-white rounded-lg shadow-md hover:shadow-lg transition p-6 border-l-4 border-indigo-600 cursor-pointer"
+                @click="$router.push(`/teacher/exams/${exam.id}`)">
                 <h4 class="text-lg font-semibold text-gray-800 mb-3 line-clamp-2">{{ exam.title }}</h4>
                 <div class="space-y-2 mb-4">
                   <div class="flex items-center gap-2 text-gray-600 text-sm">
@@ -163,15 +164,15 @@ function handleExamCreated(newExam) {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <span>Số câu hỏi: {{ exam.total_questions ?? 0 }}</span>
+                    <span>Số câu hỏi: {{ exam.question_count ?? exam.total_questions ?? exam.questionCount ?? 0 }}</span>
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <button @click="$router.push(`/teacher/exams/${exam.id}/edit`)"
+                  <button @click.stop="$router.push(`/teacher/exams/${exam.id}/edit`)"
                     class="flex-1 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition">
                     Chỉnh sửa
                   </button>
-                  <button @click="handleDelete(exam)" :disabled="deletingId === exam.id"
+                  <button @click.stop="handleDelete(exam)" :disabled="deletingId === exam.id"
                     class="flex-1 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded hover:bg-red-100 transition disabled:opacity-50">
                     {{ deletingId === exam.id ? '...' : 'Xóa' }}
                   </button>

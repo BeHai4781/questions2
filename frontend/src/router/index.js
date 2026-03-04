@@ -44,6 +44,14 @@ const router = createRouter({
       component: () => import('../pages/teachers/QuestionsPage.vue'),
     },
     {
+      path: '/teacher/exams/:id',
+      component: () => import('../pages/teachers/ExamResultsPage.vue'),
+    },
+    {
+      path: '/teacher/exams/:id/edit',
+      redirect: to => ({ path: `/teacher/exams/${to.params.id}` }),
+    },
+    {
       path: '/teacher/exam/:id/results',
       component: () => import('../pages/teachers/ExamResultsPage.vue'),
     },
