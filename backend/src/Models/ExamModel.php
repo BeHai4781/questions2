@@ -164,9 +164,26 @@ final class ExamModel
     public function deleteById(string $id): bool
     {
         if (!ctype_digit($id)) return false;
-        $st = $this->pdo->prepare('DELETE FROM exams WHERE id = :id');
-        $st->execute([':id' => (int)$id]);
-        return $st->rowCount() > 0;
+        $intId = (int)$id;
+
+        try {
+            $this->pdo->beginTransaction();
+
+            // 1. Xóa notifications liên quan (FK không có CASCADE)
+            $this->pdo->prepare('DELETE FROM notifications WHERE exam_id = :id')
+                      ->execute([':id' => $intId]);
+            // 2. Xóa exam 
+            $st = $this->pdo->prepare('DELETE FROM exams WHERE id = :id');
+            $st->execute([':id' => $intId]);
+            $deleted = $st->rowCount() > 0;
+
+            $this->pdo->commit();
+            return $deleted;
+
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
     }
 
     /** @param array<string,mixed> $row */
