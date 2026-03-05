@@ -7,7 +7,7 @@ export function useAdminApi() {
 
   return {
     // Users
-    getUsers: () => adminApi.getUsers({}, authHeaders()),
+    getUsers: (params = {}) => adminApi.getUsers(params, authHeaders()),
     getUserById: (id) => adminApi.getUserById(id, authHeaders()),
     createUser: (body) => adminApi.createUser(body, authHeaders()),
     updateUser: (id, body) => adminApi.updateUser(id, body, authHeaders()),

@@ -22,7 +22,7 @@
             v-model="searchCreator"
             type="text"
             placeholder="Tìm theo người tạo"
-            class="form-input border rounded px-3 py-2 w-full md:w-64"
+            class="form-input border rounded px-3 py-2 w-full md:w-64 hidden"
           />
           <button
             type="submit"
@@ -34,10 +34,11 @@
       </form>
 
       <div class="mb-3 text-center">
-        <strong>Tổng số đề thi:</strong> {{ filteredExams.length }}
+        <strong>Tổng số đề thi:</strong> {{ total }}
       </div>
 
-      <div v-if="paginatedExams.length > 0" class="overflow-x-auto">
+      <div v-if="loading" class="text-center py-4 text-blue-500">Đang tải...</div>
+      <div v-else-if="exams.length > 0" class="overflow-x-auto">
         <table class="min-w-full table-auto border rounded shadow">
           <thead class="bg-gray-100">
             <tr>
@@ -51,7 +52,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="exam in paginatedExams" :key="exam.id" class="hover:bg-indigo-50">
+            <tr v-for="exam in exams" :key="exam.id" class="hover:bg-indigo-50">
               <td class="px-3 py-2 border font-bold text-center">{{ exam.id }}</td>
               <td class="px-3 py-2 border">{{ exam.title }}</td>
               <td class="px-3 py-2 border">{{ exam.created_by_name }}</td>
@@ -87,12 +88,12 @@
       <div v-else class="text-gray-400 py-8 text-center">Không có đề thi nào.</div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex justify-center mt-4">
+      <div v-if="total > pageSize" class="flex justify-center mt-4">
         <nav>
           <ul class="inline-flex -space-x-px">
-            <li v-for="i in totalPages" :key="i">
+            <li v-for="i in Math.ceil(total / pageSize)" :key="i">
               <button
-                @click="currentPage = i"
+                @click="gotoPage(i)"
                 :class="[
                   'px-3 py-1 border rounded-l',
                   i === currentPage
@@ -112,38 +113,55 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
 import { useAdminApi } from '@/composables/useAdminApi.js'
 import { toast } from 'vue3-toastify'
 // Dữ liệu mẫu
 const exams = ref([])
+const total = ref(0)
+const loading = ref(false)
 const searchTitle = ref('')
 const searchCreator = ref('')
 const deletingId = ref(null)
 const showDeleteModal = ref(false)
 const examToDelete = ref(null)
 const currentPage = ref(1)
-const pageSize = 5
+const pageSize = ref(5)
 const { getExams, deleteExam } = useAdminApi()
 
-const filteredExams = computed(() => {
-  return exams.value.filter(
-    (e) =>
-      (!searchTitle.value || e.title.toLowerCase().includes(searchTitle.value.toLowerCase())) &&
-      (!searchCreator.value || e.creator.toLowerCase().includes(searchCreator.value.toLowerCase())),
-  )
-})
+async function fetchExams() {
+  loading.value = true
+  const params = {
+    page: currentPage.value,
+    limit: pageSize.value,
+    search: searchTitle.value.trim(),
+    created_by: searchCreator.value.trim(),
+  }
+  const res = await getExams(params)
+  if (res.ok) {
+    console.log('Exams fetched:', res)
+    exams.value = res.data ?? []
+    total.value = res.pagination?.total ?? 0
+  } else {
+    exams.value = []
+    total.value = 0
+  }
+  loading.value = false
+}
 
-const totalPages = computed(() => Math.ceil(filteredExams.value.length / pageSize))
-const paginatedExams = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredExams.value.slice(start, start + pageSize)
-})
+import { watch } from 'vue'
+onMounted(fetchExams)
+watch([currentPage, pageSize], fetchExams)
 
 function searchExams() {
   currentPage.value = 1
+  fetchExams()
+}
+function gotoPage(p) {
+  currentPage.value = p
+  fetchExams()
 }
 
 
@@ -172,20 +190,9 @@ async function confirmDeleteExam() {
   }
 }
 
-const fetchExams = async () => {
-  try {
-    const res = await getExams({ page: 1, limit: 100 })
-    if (res.ok) exams.value = res.data ?? []
-    else toast.error(res.error?.message || 'Lỗi tải đề thi')
-    console.log('Exams:', exams.value)
-  } catch (e) {
-    toast.error(e?.message || 'Lỗi tải đề thi')
-  }
-}
-
-onMounted(() => {
-  fetchExams()
-})
+// ...existing code...
 </script>
+
+
 
 

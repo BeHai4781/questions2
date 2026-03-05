@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
 import CreateUserModal from '@/components/CreateUserModal.vue'
@@ -10,11 +10,32 @@ import { useAuthStore } from '@/stores/auth'
 const { getUsers, updateUser, deleteUser } = useAdminApi()
 const userId = useAuthStore().user?.id
 // Dữ liệu mẫu
-const allUsers = ref([])
-const fetchUsers = async () => {
-  const res = await getUsers()
-  console.log('getUsers res', res)
-  if (res.ok) allUsers.value = res.data ?? []
+const users = ref([])
+const total = ref(0)
+const loading = ref(false)
+const page = ref(1)
+const limit = ref(5)
+const search = ref('')
+const duyetMode = ref(true) // true: actived, false: banned
+
+async function fetchUsers() {
+  loading.value = true
+  const params = {
+    page: page.value,
+    limit: limit.value,
+    search: search.value.trim(),
+    status: duyetMode.value ? 'actived' : 'banned',
+  }
+  const res = await getUsers(params)
+  if (res.ok) {
+    console.log('Users fetched:', res)
+    users.value = res.data ?? []
+    total.value = res.pagination?.total ?? 0
+  } else {
+    users.value = []
+    total.value = 0
+  }
+  loading.value = false
 }
 
 
@@ -35,22 +56,18 @@ async function handleConfirm() {
   if (!confirmAction.value || !confirmUser.value) return
   if (confirmAction.value === 'lock') {
     await updateUser(confirmUser.value.id, { ...confirmUser.value, status: 'banned' })
-    allUsers.value = allUsers.value.map((u) =>
-      u.id === confirmUser.value.id ? { ...u, status: 'banned' } : u,
-    )
+    fetchUsers()
     toast.success(`Đã khóa tài khoản ${confirmUser.value.fullname}`)
     console.log('Khóa tài khoản', confirmUser.value)
   } else if (confirmAction.value === 'unlock') {
     await updateUser(confirmUser.value.id, { ...confirmUser.value, status: 'actived' })
-    allUsers.value = allUsers.value.map((u) =>
-      u.id === confirmUser.value.id ? { ...u, status: 'actived' } : u,
-    )
+    fetchUsers()
     toast.success(`Đã mở khóa tài khoản ${confirmUser.value.fullname}`)
     console.log('Mở khóa tài khoản', confirmUser.value)
   } else if (confirmAction.value === 'delete') {
     // Gọi API xóa tài khoản
     await deleteUser(confirmUser.value.id)
-    allUsers.value = allUsers.value.filter((u) => u.id !== confirmUser.value.id)
+    fetchUsers()
     toast.success(`Đã xóa tài khoản ${confirmUser.value.fullname}`)
     console.log('Xóa tài khoản', confirmUser.value)
   }
@@ -88,47 +105,24 @@ const deleteUserById = (user) => {
   showConfirmModal('delete', user, `Bạn có chắc chắn muốn xóa tài khoản ${user.fullname}?`)
 }
 
-onMounted(() => {
-  fetchUsers()
-})  
 
-const duyetMode = ref(true) // true: đang hoạt động, false: bị cấm
-const search = ref('')
-const page = ref(1)
-const limit = 5
-
-const filteredUsers = computed(() => {
-  let users = allUsers.value.filter((u) =>
-    duyetMode.value ? u.status === 'actived' : u.status === 'banned',
-  )
-  if (search.value.trim()) {
-    const s = search.value.trim().toLowerCase()
-    users = users.filter(
-      (u) =>
-        u.fullname.toLowerCase().includes(s) ||
-        u.email.toLowerCase().includes(s) ||
-        u.phone.includes(s) ||
-        u.username.toLowerCase().includes(s),
-    )
-  }
-  return users
-})
-
-const totalPages = computed(() => Math.ceil(filteredUsers.value.length / limit))
-const pagedUsers = computed(() =>
-  filteredUsers.value.slice((page.value - 1) * limit, page.value * limit),
-)
+onMounted(fetchUsers)
+watch([page, limit, duyetMode], fetchUsers)
 
 function switchTab(mode) {
+  users.value = []
   duyetMode.value = mode
   page.value = 1
+  fetchUsers()
 }
 function onSearch(e) {
   e.preventDefault()
   page.value = 1
+  fetchUsers()
 }
 function gotoPage(p) {
   page.value = p
+  fetchUsers()
 }
 
 const createUserModalVisible = ref(false)
@@ -168,7 +162,7 @@ const closeEditUserModal = () => {
             v-model="search"
             type="text"
             class="form-input border rounded px-3 py-2 w-full md:w-72"
-            placeholder="Tìm theo tên, email, SĐT..."
+            placeholder="Tìm theo tên, email..."
           />
           <button
             type="submit"
@@ -214,7 +208,8 @@ const closeEditUserModal = () => {
       </div>
 
       <!-- Bảng danh sách -->
-      <div v-if="pagedUsers.length > 0" class="overflow-x-auto">
+      
+      <div v-if="users.length > 0" class="overflow-x-auto">
         <table class="min-w-full table-auto border rounded shadow">
           <thead class="bg-gray-100">
             <tr>
@@ -228,7 +223,7 @@ const closeEditUserModal = () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(user, idx) in pagedUsers" :key="user.id" class="hover:bg-indigo-50">
+            <tr v-for="(user, idx) in users" :key="user.id" class="hover:bg-indigo-50">
               <td class="px-3 py-2 border font-bold text-center">
                 {{ (page - 1) * limit + idx + 1 }}
               </td>
@@ -272,12 +267,13 @@ const closeEditUserModal = () => {
         </table>
       </div>
       <div v-else class="text-gray-400 py-8 text-center">Không có tài khoản nào.</div>
+      <div v-if="loading" class="text-center py-4 text-blue-500">Đang tải...</div>
 
       <!-- Phân trang -->
-      <div v-if="totalPages > 1" class="flex justify-center mt-4">
+      <div v-if="total > limit" class="flex justify-center mt-4">
         <nav>
           <ul class="inline-flex -space-x-px">
-            <li v-for="i in totalPages" :key="i">
+            <li v-for="i in Math.ceil(total / limit)" :key="i">
               <button
                 @click="gotoPage(i)"
                 :class="[

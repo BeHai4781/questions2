@@ -34,10 +34,11 @@
       </form>
 
       <div class="mb-3 text-center">
-        <strong>Tổng số câu hỏi:</strong> {{ filteredQuestions.length }}
+        <strong>Tổng số câu hỏi:</strong> {{ total }}
       </div>
 
-      <div v-if="paginatedQuestions.length > 0" class="overflow-x-auto">
+      <div v-if="loading" class="text-center py-4 text-blue-500">Đang tải...</div>
+      <div v-else-if="questions.length > 0" class="overflow-x-auto">
         <table class="min-w-full table-auto border rounded shadow">
           <thead class="bg-gray-100">
             <tr>
@@ -49,7 +50,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="q in paginatedQuestions" :key="q.id" class="hover:bg-indigo-50">
+            <tr v-for="q in questions" :key="q.id" class="hover:bg-indigo-50">
               <td class="px-3 py-2 border font-bold text-center">{{ q.id }}</td>
               <td class="px-3 py-2 border">{{ q.class_name }}</td>
               <td class="px-3 py-2 border">{{ q.level_name }}</td>
@@ -85,12 +86,12 @@
       <div v-else class="text-gray-400 py-8 text-center">Không có câu hỏi nào.</div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex justify-center mt-4">
+      <div v-if="total > pageSize" class="flex justify-center mt-4">
         <nav>
           <ul class="inline-flex -space-x-px">
-            <li v-for="i in totalPages" :key="i">
+            <li v-for="i in Math.ceil(total / pageSize)" :key="i">
               <button
-                @click="currentPage = i"
+                @click="gotoPage(i)"
                 :class="[
                   'px-3 py-1 border rounded-l',
                   i === currentPage
@@ -110,14 +111,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import AdminHeader from '@/includes/AdminHeader.vue'
 import AppFooter from '@/includes/AppFooter.vue'
 import { useAdminApi } from '@/composables/useAdminApi.js'
 import { toast } from 'vue3-toastify'
 
 // Dữ liệu mẫu
+
 const questions = ref([])
+const total = ref(0)
+const loading = ref(false)
 const { getQuestions, deleteQuestion } = useAdminApi()
 const searchLevel = ref('')
 const searchClass = ref('')
@@ -125,41 +129,38 @@ const deletingId = ref(null)
 const showDeleteModal = ref(false)
 const questionToDelete = ref(null)
 const currentPage = ref(1)
-const pageSize = 5
+const pageSize = ref(5)
 
-
-const fetchQuestions = async () => {
-  try {
-    const res = await getQuestions({ page: 1, limit: 100 })
-    if (res.ok) questions.value = res.data ?? []
-    else toast.error(res.error?.message || 'Lỗi tải câu hỏi')
-    console.log('Questions:', questions.value)
-  } catch (e) {
-    toast.error(e?.message || 'Lỗi tải câu hỏi')
+async function fetchQuestions() {
+  loading.value = true
+  const params = {
+    page: currentPage.value,
+    limit: pageSize.value,
+    class: searchClass.value.trim(),
+    difficulty: searchLevel.value.trim(),
   }
+  const res = await getQuestions(params)
+  if (res.ok) {
+    console.log('Fetched questions:', res)
+    questions.value = res.data ?? []
+    total.value = res.pagination?.total ?? 0
+  } else {
+    questions.value = []
+    total.value = 0
+  }
+  loading.value = false
 }
 
-onMounted(() => {
-  fetchQuestions()
-})
-
-const filteredQuestions = computed(() => {
-  return questions.value.filter(
-    (q) =>
-      (!searchLevel.value ||
-        q.level_name.toLowerCase().includes(searchLevel.value.toLowerCase())) &&
-      (!searchClass.value || q.class_name.toLowerCase().includes(searchClass.value.toLowerCase())),
-  )
-})
-
-const totalPages = computed(() => Math.ceil(filteredQuestions.value.length / pageSize))
-const paginatedQuestions = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredQuestions.value.slice(start, start + pageSize)
-})
+onMounted(fetchQuestions)
+watch([currentPage, pageSize], fetchQuestions)
 
 function searchQuestions() {
   currentPage.value = 1
+  fetchQuestions()
+}
+function gotoPage(p) {
+  currentPage.value = p
+  fetchQuestions()
 }
 
 

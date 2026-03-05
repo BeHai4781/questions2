@@ -283,7 +283,7 @@ import { toast } from 'vue3-toastify'
 
 // Dữ liệu mẫu
 
-const { getNotifications, markNotificationRead, markAllNotificationsRead } = useAdminApi()
+const { getNotifications } = useAdminApi()
 const fetchNotifications = async () => {
   try {
     const res = await getNotifications({ })
