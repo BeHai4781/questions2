@@ -30,7 +30,7 @@ if (($_ENV['NODE_ENV'] ?? 'development') === 'development') {
 }
 
 $windowMs = (int)($_ENV['RATE_LIMIT_WINDOW_MS'] ?? (15 * 60 * 1000));
-$maxRequests = (int)($_ENV['RATE_LIMIT_MAX_REQUESTS'] ?? 100);
+$maxRequests = (int)($_ENV['RATE_LIMIT_MAX_REQUESTS'] ?? 1000);
 \App\Middleware\RateLimiter::enforce('/api/', $windowMs, $maxRequests);
 
 try {
