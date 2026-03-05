@@ -1,15 +1,18 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useStudentApi } from '@/composables/useStudentApi.js'
 
 const studentApi = useStudentApi()
 const attempts = ref([])
+const total = ref(0)
 const examMap = ref({})
 const loading = ref(true)
 const error = ref(null)
+const page = ref(1)
+const limit = ref(10)
 
 const historyList = computed(() => {
-  const items = attempts.value.map((a) => {
+  return attempts.value.map((a) => {
     const exam = examMap.value[a.exam_id ?? a.examId] || {}
     const startRaw = a.start_time ?? a.startTime
     const endRaw = a.submit_time ?? a.submittedAt ?? a.submitted_at
@@ -25,49 +28,55 @@ const historyList = computed(() => {
       }
     }
     if (durationText === '-') {
-      const rawDuration =
-        a.durationMins ??
-        a.duration_mins ??
-        a.time
+      const rawDuration = a.durationMins ?? a.duration_mins ?? a.time
       if (rawDuration != null && rawDuration !== '') {
         durationText = `${rawDuration} phút`
       }
     }
     const dateRaw = a.submitted_at ?? a.submittedAt ?? a.created_at ?? a.createdAt ?? null
-    const ts = dateRaw ? Date.parse(dateRaw) || 0 : 0
     return {
       id: a.id,
       title: exam.title || exam.name || `Đề #${a.exam_id ?? a.examId}`,
       date: dateRaw ?? '-',
-      score: a.result ?? a.score ?? '-',
+      score: a.result ?? a.score ?? a.total_score ?? '-',
       duration: durationText,
-      _ts: ts,
     }
   })
-  // Sắp xếp theo thời gian nộp, bản ghi không có ngày sẽ xuống cuối
-  return items
-    .sort((a, b) => (b._ts ?? 0) - (a._ts ?? 0))
-    .map(({ _ts, ...rest }) => rest)
 })
 
-onMounted(async () => {
-  loading.value = true
-  error.value = null
-  const [attemptsRes, examsRes] = await Promise.all([
-    studentApi.getAttempts({ page: 1, limit: 50 }),
-    studentApi.getExams({ page: 1, limit: 100 }),
-  ])
-  if (attemptsRes.ok) attempts.value = attemptsRes.data ?? []
-  else error.value = attemptsRes.error?.message
-  if (examsRes.ok) {
+async function loadExamMap() {
+  const examsRes = await studentApi.getExams({ page: 1, limit: 100 })
+  if (examsRes.ok && Array.isArray(examsRes.data)) {
     const map = {}
-    ;(examsRes.data ?? []).forEach((e) => {
-      map[e.id] = e
-    })
+    examsRes.data.forEach((e) => { map[e.id] = e })
     examMap.value = map
   }
+}
+
+async function fetchAttempts() {
+  loading.value = true
+  error.value = null
+  const res = await studentApi.getAttempts({ page: page.value, limit: limit.value })
+  if (res.ok) {
+    attempts.value = res.data ?? []
+    total.value = res.pagination?.total ?? 0
+  } else {
+    attempts.value = []
+    total.value = 0
+    error.value = res.error?.message
+  }
   loading.value = false
+}
+
+function gotoPage(p) {
+  page.value = p
+}
+
+onMounted(async () => {
+  await loadExamMap()
+  fetchAttempts()
 })
+watch([page, limit], fetchAttempts)
 </script>
 
 <template>
@@ -80,6 +89,7 @@ onMounted(async () => {
     <table v-else class="w-full border-separate border-spacing-y-2">
       <thead>
         <tr class="text-indigo-700 text-base text-center">
+          <th class="py-2">STT</th>
           <th class="py-2">Tên đề thi</th>
           <th class="py-2">Ngày làm</th>
           <th class="py-2">Điểm</th>
@@ -89,13 +99,14 @@ onMounted(async () => {
       </thead>
       <tbody>
         <tr v-if="!historyList.length">
-          <td colspan="5" class="text-center text-gray-500 py-4">Chưa có lịch sử làm bài.</td>
+          <td colspan="6" class="text-center text-gray-500 py-4">Chưa có lịch sử làm bài.</td>
         </tr>
         <tr
-          v-for="item in historyList"
+          v-for="(item, idx) in historyList"
           :key="item.id"
           class="bg-indigo-50 hover:bg-indigo-100 transition rounded-lg text-black"
         >
+          <td class="py-3 px-4 text-center font-bold">{{ (page - 1) * limit + idx + 1 }}</td>
           <td class="py-3 px-4 font-semibold">{{ item.title }}</td>
           <td class="py-3 px-4 text-center">{{ item.date }}</td>
           <td class="py-3 px-4 text-indigo-700 font-bold text-center">{{ item.score }}</td>
@@ -110,5 +121,26 @@ onMounted(async () => {
         </tr>
       </tbody>
     </table>
+    <!-- Phân trang -->
+    <div v-if="total > limit" class="flex justify-center mt-4">
+      <nav>
+        <ul class="inline-flex -space-x-px">
+          <li v-for="i in Math.ceil(total / limit)" :key="i">
+            <button
+              type="button"
+              @click="gotoPage(i)"
+              :class="[
+                'px-3 py-1 border rounded-l',
+                i === page
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-white text-indigo-700 hover:bg-indigo-100',
+              ]"
+            >
+              {{ i }}
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
   </div>
 </template>
