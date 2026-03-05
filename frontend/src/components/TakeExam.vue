@@ -4,6 +4,37 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue3-toastify'
 import { useStudentApi } from '@/composables/useStudentApi.js'
 
+const STORAGE_KEY_PREFIX = 'ems_exam_'
+
+function getStorageKey(examId) {
+  return examId ? `${STORAGE_KEY_PREFIX}${examId}` : null
+}
+
+function loadExamState(examId) {
+  const key = getStorageKey(examId)
+  if (!key) return null
+  try {
+    const raw = sessionStorage.getItem(key)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function saveExamState(examId, data) {
+  const key = getStorageKey(examId)
+  if (!key) return
+  try {
+    sessionStorage.setItem(key, JSON.stringify(data))
+  } catch (_) {}
+}
+
+function clearExamState(examId) {
+  const key = getStorageKey(examId)
+  if (key) sessionStorage.removeItem(key)
+}
+
 const props = defineProps({
   examId: { type: String, default: null },
 })
@@ -43,11 +74,24 @@ function normalizeQuestions(examData) {
 
 function startTimer() {
   const duration = Number(exam.value?.duration ?? 0)
-  timeLeft.value = duration > 0 ? duration * 60 : 0
-  elapsed.value = 0
-  if (!startedAt.value) {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const startSec = startedAt.value ? Math.floor(new Date(startedAt.value).getTime() / 1000) : null
+
+  if (startSec != null) {
+    const elapsedSec = nowSec - startSec
+    if (isTimed.value && duration > 0) {
+      const totalSec = duration * 60
+      timeLeft.value = Math.max(0, totalSec - elapsedSec)
+      if (timeLeft.value <= 0) finished.value = true
+    } else {
+      elapsed.value = Math.max(0, elapsedSec)
+    }
+  } else {
     startedAt.value = new Date().toISOString()
+    timeLeft.value = duration > 0 ? duration * 60 : 0
+    elapsed.value = 0
   }
+
   const interval = setInterval(() => {
     if (finished.value) {
       clearInterval(interval)
@@ -56,12 +100,10 @@ function startTimer() {
     if (isTimed.value) {
       if (timeLeft.value > 0) timeLeft.value--
       else {
-        // Đề có giới hạn thời gian: hết giờ thì khóa bài
         finished.value = true
         clearInterval(interval)
       }
     } else {
-      // Đề ôn tập: không khóa, chỉ đếm xuôi từ 00:00
       elapsed.value++
     }
   }, 1000)
@@ -88,8 +130,26 @@ async function loadExam() {
   questions.value.forEach((q) => {
     init[q.id] = null
   })
-  answers.value = { ...init }
+
+  const saved = loadExamState(props.examId)
+  if (saved?.startedAt) {
+    startedAt.value = saved.startedAt
+  }
+  if (saved?.answers && typeof saved.answers === 'object') {
+    const merged = { ...init }
+    questions.value.forEach((q) => {
+      const id = String(q.id)
+      if (saved.answers[id] !== undefined && saved.answers[id] !== null && saved.answers[id] !== '') {
+        merged[q.id] = saved.answers[id]
+      }
+    })
+    answers.value = merged
+  } else {
+    answers.value = { ...init }
+  }
+
   startTimer()
+  saveExamState(props.examId, { startedAt: startedAt.value, answers: answers.value })
   loading.value = false
 }
 
@@ -102,6 +162,23 @@ watch(
   (id) => {
     if (id) loadExam()
   }
+)
+
+let saveTimeout = null
+watch(
+  () => answers.value,
+  (val) => {
+    if (!props.examId || !val || typeof val !== 'object') return
+    if (saveTimeout) clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(() => {
+      saveExamState(props.examId, {
+        startedAt: startedAt.value,
+        answers: { ...val },
+      })
+      saveTimeout = null
+    }, 300)
+  },
+  { deep: true }
 )
 
 function calculateScore() {
@@ -154,6 +231,7 @@ async function handleSubmit() {
       startTime: startedAt.value,
     })
     if (res.ok && res.data?.attempt?.id) {
+      clearExamState(props.examId)
       toast.success('Bạn đã hoàn thành bài thi!')
       setTimeout(() => {
         router.push(`/student/history?id=${res.data.attempt.id}`)
