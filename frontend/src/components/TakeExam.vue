@@ -181,6 +181,7 @@ watch(
   { deep: true }
 )
 
+/** Điểm theo thang 10: mỗi câu chia đều, tổng = tổng điểm các câu đúng (backend cũng tính lại khi nộp). */
 function calculateScore() {
   let correct = 0
   questions.value.forEach((q) => {
@@ -189,7 +190,9 @@ function calculateScore() {
     if (userChoice != null && userChoice !== '' && String(userChoice) === String(correctId)) correct++
   })
   const total = questions.value.length
-  return total ? Math.round((correct / total) * 100) : 0
+  if (!total) return 0
+  const pointsPerQuestion = 10 / total
+  return Math.round(correct * pointsPerQuestion * 100) / 100
 }
 
 async function handleSubmit() {
