@@ -52,6 +52,7 @@ const finished = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const error = ref(null)
+const showCancelConfirm = ref(false)
 
 const isTimed = computed(() => Number(exam.value?.duration ?? 0) > 0)
 
@@ -252,9 +253,17 @@ async function handleSubmit() {
 }
 
 function handleCancel() {
-  if (confirm('Bạn có chắc chắn không làm tiếp bài thi này?')) {
-    router.push('/student/exam')
-  }
+  if (finished.value || submitting.value) return
+  showCancelConfirm.value = true
+}
+
+function closeCancelConfirm() {
+  showCancelConfirm.value = false
+}
+
+function confirmCancel() {
+  showCancelConfirm.value = false
+  router.push('/student/exam')
 }
 
 function answerOptions(q) {
@@ -342,5 +351,30 @@ function answerOptions(q) {
       </form>
       <p v-else class="text-gray-500">Đề thi chưa có câu hỏi.</p>
     </template>
+  </div>
+  <div
+    v-if="showCancelConfirm"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+  >
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <h3 class="text-lg font-bold text-gray-900">Xác nhận hủy bài thi</h3>
+      <p class="mt-2 text-sm text-gray-600">Bạn có chắc chắn không làm tiếp bài thi này?</p>
+      <div class="mt-6 flex items-center justify-end gap-3">
+        <button
+          type="button"
+          class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
+          @click="closeCancelConfirm"
+        >
+          Tiếp tục làm
+        </button>
+        <button
+          type="button"
+          class="rounded-lg px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition"
+          @click="confirmCancel"
+        >
+          Xác nhận hủy
+        </button>
+      </div>
+    </div>
   </div>
 </template>

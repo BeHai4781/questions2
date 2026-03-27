@@ -85,7 +85,7 @@ const sortedRecentAttempts = computed(() => {
     const tb = db ? Date.parse(db) || 0 : 0
     return tb - ta
   })
-  return list
+  return list.slice(0, 5)
 })
 
 onMounted(async () => {

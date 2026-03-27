@@ -122,10 +122,9 @@ final class ExamAttemptModel
         $newId = (string)$st->fetchColumn();
         $resultId = (int)$newId;
 
-        $examId = (int)($payload['exam_id'] ?? 0);
         $answers = $data['answers'] ?? [];
         if (is_array($answers) && $answers !== []) {
-            $this->saveResultDetails($resultId, $examId, $answers);
+            $this->saveResultDetails($resultId, $answers);
         }
 
         $created = $this->findById($newId);
@@ -133,23 +132,15 @@ final class ExamAttemptModel
     }
 
     /**
-     * Lưu từng đáp án đã chọn vào result_details.
-     * Chấm điểm: tối đa 10/đề, chia đều cho số câu; mỗi câu đúng được điểm tương ứng (không dùng score từ bảng questions).
+     * Lưu từng đáp án đã chọn vào result_details (schema questions3).
      * @param array<string|int, string|int> $answers question_id => selected_ans_id
      */
-    private function saveResultDetails(int $resultId, int $examId, array $answers): void
+    private function saveResultDetails(int $resultId, array $answers): void
     {
         $ansIds = array_values(array_map('intval', array_filter($answers, static fn($v) => $v !== null && $v !== '')));
         if ($ansIds === []) {
             return;
         }
-
-        $st = $this->pdo->prepare('SELECT COUNT(*) FROM questions WHERE exam_id = :eid');
-        $st->execute([':eid' => $examId]);
-        $totalQuestions = (int)$st->fetchColumn();
-        $totalQuestions = $totalQuestions > 0 ? $totalQuestions : 1;
-        $pointsPerQuestion = round(10.0 / $totalQuestions, 2);
-
         $placeholders = implode(',', array_fill(0, count($ansIds), '?'));
         $st = $this->pdo->prepare("SELECT id, is_correct FROM answers WHERE id IN ({$placeholders})");
         $st->execute(array_values($ansIds));
@@ -161,7 +152,6 @@ final class ExamAttemptModel
         $ins = $this->pdo->prepare(
             'INSERT INTO result_details (result_id, question_id, selected_ans_id, is_correct, score) VALUES (:rid, :qid, :aid, CAST(:correct AS boolean), :score)'
         );
-        $totalScore = 0.0;
         foreach ($answers as $questionId => $selectedAnsId) {
             $qid = (int)$questionId;
             $aid = (int)$selectedAnsId;
@@ -169,8 +159,7 @@ final class ExamAttemptModel
                 continue;
             }
             $isCorrect = $correctMap[(string)$selectedAnsId] ?? false;
-            $score = $isCorrect ? $pointsPerQuestion : 0.00;
-            $totalScore += $score;
+            $score = $isCorrect ? 1.00 : 0.00;
             $ins->bindValue(':rid', $resultId, PDO::PARAM_INT);
             $ins->bindValue(':qid', $qid, PDO::PARAM_INT);
             $ins->bindValue(':aid', $aid, PDO::PARAM_INT);
@@ -178,9 +167,6 @@ final class ExamAttemptModel
             $ins->bindValue(':score', $score, PDO::PARAM_STR);
             $ins->execute();
         }
-
-        $up = $this->pdo->prepare('UPDATE exam_results SET total_score = :score WHERE id = :id');
-        $up->execute([':score' => round($totalScore, 2), ':id' => $resultId]);
     }
 
     /** @return array<string,mixed>|null */

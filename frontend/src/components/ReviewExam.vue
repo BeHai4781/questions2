@@ -131,7 +131,12 @@ const attemptDurationText = computed(() => {
   return '-'
 })
 const totalQuestions = computed(() => (questions.value.length || attempt.value?.total_questions) ?? exam.value?.total_questions ?? '-')
-const resultScore = computed(() => attempt.value?.result ?? attempt.value?.score ?? '-')
+const resultScore = computed(() => {
+  const rawScore = attempt.value?.result ?? attempt.value?.score
+  const numericScore = Number(rawScore)
+  if (!Number.isFinite(numericScore)) return '-'
+  return Math.max(0, Math.min(10, numericScore))
+})
 const submittedAt = computed(() => attempt.value?.submitted_at ?? attempt.value?.submittedAt ?? '-')
 </script>
 
